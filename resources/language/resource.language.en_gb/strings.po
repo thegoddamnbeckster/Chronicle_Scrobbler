@@ -1,0 +1,242 @@
+# Kodi Media Center language file
+# Addon Name: Chronicle Scrobbler
+# Addon id: service.chronicle.scrobbler
+# Addon Provider: Michael Beck
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# ── General / menu ────────────────────────────────────────────────────────────
+
+msgctxt "#32000"
+msgid "Chronicle Scrobbler"
+msgstr ""
+
+# ── Settings categories ───────────────────────────────────────────────────────
+
+msgctxt "#32001"
+msgid "Connection"
+msgstr ""
+
+msgctxt "#32002"
+msgid "Chronicle URL"
+msgstr ""
+
+msgctxt "#32003"
+msgid "API Key"
+msgstr ""
+
+msgctxt "#32004"
+msgid "Scrobbling"
+msgstr ""
+
+msgctxt "#32005"
+msgid "Progress"
+msgstr ""
+
+msgctxt "#32006"
+msgid "Watched threshold (%)"
+msgstr ""
+
+msgctxt "#32007"
+msgid "Poll interval (seconds)"
+msgstr ""
+
+msgctxt "#32008"
+msgid "Media types to scrobble"
+msgstr ""
+
+msgctxt "#32009"
+msgid "Scrobble movies"
+msgstr ""
+
+# ── Main menu items ───────────────────────────────────────────────────────────
+
+msgctxt "#32010"
+msgid "Reset TV Show Progress"
+msgstr ""
+
+msgctxt "#32011"
+msgid "Reset Movie Progress"
+msgstr ""
+
+msgctxt "#32012"
+msgid "Test Connection"
+msgstr ""
+
+msgctxt "#32013"
+msgid "Open Settings"
+msgstr ""
+
+msgctxt "#32015"
+msgid "Scrobble TV shows"
+msgstr ""
+
+msgctxt "#32016"
+msgid "Scrobble music"
+msgstr ""
+
+# ── Connection test ───────────────────────────────────────────────────────────
+
+msgctxt "#32020"
+msgid "Connection to Chronicle successful!"
+msgstr ""
+
+msgctxt "#32021"
+msgid "Connection failed:"
+msgstr ""
+
+# ── TV show reset ─────────────────────────────────────────────────────────────
+
+msgctxt "#32030"
+msgid "No TV shows found in your Kodi library."
+msgstr ""
+
+msgctxt "#32031"
+msgid "Select TV show to reset"
+msgstr ""
+
+msgctxt "#32032"
+msgid "Reset all episode progress for [B]{0}[/B]?[CR][CR]Kodi playcounts and resume points will be cleared.[CR]Your Chronicle watch history is preserved."
+msgstr ""
+
+msgctxt "#32033"
+msgid "Resetting {0}…"
+msgstr ""
+
+msgctxt "#32034"
+msgid "Done![CR]Cleared progress for [B]{1}[/B] episodes of [B]{0}[/B]."
+msgstr ""
+
+msgctxt "#32035"
+msgid "{0} of {1} episodes could not be reset. Check the Kodi log for details."
+msgstr ""
+
+# ── Movie reset ───────────────────────────────────────────────────────────────
+
+msgctxt "#32040"
+msgid "No movies found in your Kodi library."
+msgstr ""
+
+msgctxt "#32041"
+msgid "Select movie to reset"
+msgstr ""
+
+msgctxt "#32042"
+msgid "Reset watch progress for [B]{0}[/B]?[CR][CR]Kodi playcount and resume point will be cleared.[CR]Your Chronicle watch history is preserved."
+msgstr ""
+
+msgctxt "#32043"
+msgid "Progress for [B]{0}[/B] has been reset."
+msgstr ""
+
+msgctxt "#32044"
+msgid "Failed to reset [B]{0}[/B]. Check the Kodi log for details."
+msgstr ""
+
+# ── List / playlist sync ───────────────────────────────────────────────────────
+
+msgctxt "#32050"
+msgid "Sync Lists to Kodi"
+msgstr ""
+
+msgctxt "#32051"
+msgid "Fetching lists from Chronicle…"
+msgstr ""
+
+msgctxt "#32052"
+msgid "Syncing [B]{0}[/B]…"
+msgstr ""
+
+msgctxt "#32053"
+msgid "Sync failed:"
+msgstr ""
+
+msgctxt "#32054"
+msgid "No lists found on Chronicle."
+msgstr ""
+
+msgctxt "#32055"
+msgid "Done! {0} playlists written, {1} failed."
+msgstr ""
+
+# ── Device / QR auth ──────────────────────────────────────────────────────────
+
+msgctxt "#32060"
+msgid "Connect to Chronicle"
+msgstr ""
+
+msgctxt "#32061"
+msgid "Connect to Chronicle"
+msgstr ""
+
+msgctxt "#32062"
+msgid "Connecting to Chronicle…"
+msgstr ""
+
+msgctxt "#32063"
+msgid "Scan the QR code with your phone"
+msgstr ""
+
+msgctxt "#32064"
+msgid "Waiting for approval…"
+msgstr ""
+
+msgctxt "#32065"
+msgid "Could not contact the Chronicle server."
+msgstr ""
+
+msgctxt "#32066"
+msgid "Connected to Chronicle!"
+msgstr ""
+
+msgctxt "#32067"
+msgid "Authorisation cancelled or expired."
+msgstr ""
+
+msgctxt "#32068"
+msgid "Your code"
+msgstr ""
+
+msgctxt "#32069"
+msgid "Cancel"
+msgstr ""
+
+# ── Chronicle -> Kodi sync (Phase 1) ──────────────────────────────────────────
+
+msgctxt "#32070"
+msgid "Sync Watch History & Ratings Now"
+msgstr ""
+
+msgctxt "#32071"
+msgid "Fetching your Chronicle library…"
+msgstr ""
+
+msgctxt "#32072"
+msgid "Syncing: {0}"
+msgstr ""
+
+msgctxt "#32073"
+msgid "Done! {0} synced, {1} skipped, {2} failed."
+msgstr ""
+
+msgctxt "#32074"
+msgid "Sync (Chronicle -> Kodi)"
+msgstr ""
+
+msgctxt "#32075"
+msgid "What to sync"
+msgstr ""
+
+msgctxt "#32076"
+msgid "Sync ratings"
+msgstr ""
+
+msgctxt "#32077"
+msgid "Sync artwork"
+msgstr ""
+
+msgctxt "#32078"
+msgid "Sync play counts / last played"
+msgstr ""
