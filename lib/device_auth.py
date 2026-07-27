@@ -13,6 +13,7 @@ DeviceAuthController):
   6. When denied/expired, show error and close
 """
 
+import socket
 import threading
 import time
 import json
@@ -115,7 +116,7 @@ class DeviceAuthManager:
         if not base_url:
             return None
 
-        device_name = 'Kodi — {0}'.format(xbmcgui.Window(10000).getProperty('System.FriendlyName') or 'Kodi')
+        device_name = self._get_device_name()
 
         try:
             url     = '{0}/api/v1/auth/device'.format(base_url)
@@ -132,6 +133,30 @@ class DeviceAuthManager:
         except Exception as exc:
             log.error('Device auth initiation failed: {0}'.format(exc))
             return None
+
+    @staticmethod
+    def _get_device_name() -> str:
+        """Prefer the machine's actual DNS name over Kodi's own FriendlyName setting --
+        FriendlyName is just an arbitrary label the user can set to anything, while a
+        real DNS name is a verifiable identifier for the physical device, which matters
+        more on a screen that's asking "is this really my device connecting?".
+
+        socket.getfqdn() tries a genuine reverse-DNS/hosts lookup and upgrades to a
+        dotted name when that succeeds, but on a typical home LAN there's usually no
+        such record -- it then falls back to the plain OS hostname (e.g. "Vision"),
+        which is still a real, meaningful identifier (often mDNS-resolvable as
+        "Vision.local") and clearly better than an arbitrary Kodi settings label. Only
+        the degenerate "localhost" non-answer is treated as "no usable name".
+        """
+        try:
+            fqdn = socket.getfqdn().strip()
+            if fqdn and fqdn.lower() not in ('localhost', 'localhost.localdomain'):
+                return fqdn
+        except Exception as exc:
+            log.debug('DNS name lookup failed: {0}'.format(exc))
+
+        friendly_name = xbmcgui.Window(10000).getProperty('System.FriendlyName')
+        return 'Kodi — {0}'.format(friendly_name or 'Kodi')
 
     def _download_qr(self, qr_url: str, code: str) -> str:
         """Download QR PNG to a temp file unique to this code, return its special:// VFS
