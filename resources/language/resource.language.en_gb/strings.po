@@ -221,6 +221,10 @@ msgctxt "#32073"
 msgid "Done! {0} synced, {1} skipped, {2} failed."
 msgstr ""
 
+msgctxt "#32079"
+msgid "Not configured yet — opening settings so you can enter your Chronicle server and connect."
+msgstr ""
+
 msgctxt "#32074"
 msgid "Sync (Chronicle -> Kodi)"
 msgstr ""

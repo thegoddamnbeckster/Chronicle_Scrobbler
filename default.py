@@ -26,8 +26,23 @@ ADDON = xbmcaddon.Addon()
 log   = Logger('default')
 
 
+def _is_configured():
+    """True once a server URL and API key are both present."""
+    return bool(ADDON.getSetting('chronicle_url')) and bool(ADDON.getSetting('api_key'))
+
+
 def show_menu():
-    """Display the main action menu."""
+    """Display the main action menu, or jump straight to Settings on first run."""
+    if not _is_configured():
+        xbmcgui.Dialog().notification(
+            ADDON.getLocalizedString(32000),   # "Chronicle Scrobbler"
+            ADDON.getLocalizedString(32079),   # "Not configured yet — opening settings…"
+            xbmcgui.NOTIFICATION_INFO,
+            4000,
+        )
+        ADDON.openSettings()
+        return
+
     options = [
         ADDON.getLocalizedString(32070),  # Sync Watch History & Ratings Now
         ADDON.getLocalizedString(32010),  # Reset TV Show Progress
