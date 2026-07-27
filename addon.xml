@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.0.0"
+       version="2.0.1"
        provider-name="Michael Beck">
 
   <requires>
+    <!-- xbmc.gui is NOT a real resolvable addon dependency on modern Kodi — GUI
+         functionality (xbmcgui module) ships bundled with xbmc.python itself.
+         Confirmed via kodi.log: "The dependency on xbmc.gui version 5.14.0 could
+         not be satisfied." Verified correct against three real, currently-working
+         addons on this exact Kodi 21.3 install (script.trakt, script.simkl.scrobbler,
+         and the core-shipped service.xbmc.versioncheck) — none of them declare
+         xbmc.gui either, only xbmc.python. -->
     <import addon="xbmc.python"  version="3.0.0"/>
-    <import addon="xbmc.gui"     version="5.14.0"/>
   </requires>
 
   <!-- Background service — starts automatically at login -->
@@ -30,6 +36,11 @@
       fresh rewatch while keeping your full history safe in Chronicle.
     </description>
     <news>
+      v2.0.1 - Fix: remove the xbmc.gui dependency declaration — it's not a real
+               resolvable addon on modern Kodi (GUI functionality ships bundled
+               with xbmc.python), and declaring it caused every install attempt
+               to fail with "dependency on xbmc.gui version 5.14.0 could not be
+               satisfied".
       v2.0.0 - Bidirectional sync: ratings + art (Chronicle -> Kodi, source of
                truth) and play count / last-played reconciliation (whichever
                side is more recent wins) for movies, movie collections, TV
