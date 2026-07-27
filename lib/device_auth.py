@@ -57,7 +57,7 @@ class DeviceAuthManager:
         display_code     = result['displayCode']
         qr_url           = result['qrUrl']
         verification_url = result['verificationUrl']
-        expires_in       = int(result.get('expiresInSeconds', 300))
+        expires_in       = int(result.get('expiresInSeconds', 900))
 
         log.info('Device auth initiated — display code: {0}'.format(display_code))
 

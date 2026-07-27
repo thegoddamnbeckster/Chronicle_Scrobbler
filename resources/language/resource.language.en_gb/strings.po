@@ -237,6 +237,10 @@ msgctxt "#32082"
 msgid "Not connected"
 msgstr ""
 
+msgctxt "#32083"
+msgid "Chronicle URL is set to 'localhost' or a loopback address. This only works if Chronicle runs on this same device -- if it's on a different machine, phones and other Kodi installs won't be able to reach it. Keep this address anyway?"
+msgstr ""
+
 msgctxt "#32074"
 msgid "Sync (Chronicle -> Kodi)"
 msgstr ""

@@ -58,6 +58,29 @@ def _refresh_auth_status():
     )
 
 
+_LOOPBACK_MARKERS = ('localhost', '127.0.0.1', '::1')
+
+
+def _warn_if_localhost():
+    """Catch a URL that will only work if Chronicle runs on this same device --
+    Kodi and Chronicle are commonly on separate machines, and a loopback address
+    only became reachable at all here because Kodi happened to be on the same
+    box as the server during testing. Runs right after Settings closes rather
+    than reactively on every settings change, so it only fires once per visit
+    instead of on every unrelated toggle.
+    """
+    url = ADDON.getSetting('chronicle_url').lower()
+    if not url or not any(marker in url for marker in _LOOPBACK_MARKERS):
+        return
+
+    keep = xbmcgui.Dialog().yesno(
+        ADDON.getLocalizedString(32000),   # "Chronicle Scrobbler"
+        ADDON.getLocalizedString(32083),   # loopback warning text
+    )
+    if not keep:
+        ADDON.setSetting('chronicle_url', '')
+
+
 def show_menu():
     """Display the main action menu, or jump straight to Settings on first run."""
     args = _get_args()
@@ -74,6 +97,7 @@ def show_menu():
             4000,
         )
         ADDON.openSettings()
+        _warn_if_localhost()
         return
 
     options = [
@@ -104,6 +128,7 @@ def show_menu():
     elif choice == 6:
         _refresh_auth_status()
         ADDON.openSettings()
+        _warn_if_localhost()
 
 
 def _test_connection():
