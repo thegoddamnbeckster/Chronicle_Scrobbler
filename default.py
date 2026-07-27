@@ -12,6 +12,8 @@ Presents a simple action menu:
   • Open Settings
 """
 
+import sys
+
 import xbmcgui
 import xbmcaddon
 
@@ -26,14 +28,36 @@ ADDON = xbmcaddon.Addon()
 log   = Logger('default')
 
 
-def _is_configured():
-    """True once a server URL and API key are both present."""
-    return bool(ADDON.getSetting('chronicle_url')) and bool(ADDON.getSetting('api_key'))
+def _has_url_configured():
+    """True once a server URL has been entered.
+
+    Deliberately does NOT also require an API key — the whole point of the
+    QR/PIN flow is that the key gets filled in *by* connecting, not before.
+    Requiring it here would make "Connect to Chronicle" unreachable: the menu
+    item that starts the auth flow would never show until auth had already
+    happened.
+    """
+    return bool(ADDON.getSetting('chronicle_url'))
+
+
+def _get_args():
+    """Parse action=... from RunScript(service.chronicle.scrobbler,action=...) calls."""
+    args = {}
+    for arg in sys.argv[1:]:
+        if '=' in arg:
+            key, value = arg.split('=', 1)
+            args[key] = value
+    return args
 
 
 def show_menu():
     """Display the main action menu, or jump straight to Settings on first run."""
-    if not _is_configured():
+    args = _get_args()
+    if args.get('action') == 'auth':
+        _connect_to_chronicle()
+        return
+
+    if not _has_url_configured():
         xbmcgui.Dialog().notification(
             ADDON.getLocalizedString(32000),   # "Chronicle Scrobbler"
             ADDON.getLocalizedString(32079),   # "Not configured yet — opening settings…"

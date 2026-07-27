@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.0.5"
+       version="2.0.6"
        provider-name="Michael Beck">
 
   <requires>
@@ -29,56 +29,16 @@
       <icon>icon.png</icon>
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
-    <description lang="en_GB">
-      Scrobbles your Kodi playback to your self-hosted Chronicle server, and
-      syncs ratings, artwork, and watch counts both ways. Chronicle is the
-      source of truth for ratings and art (always pushed to Kodi); play
-      counts and last-played dates reconcile in whichever direction has the
-      more recent watch. Covers movies, movie collections, TV shows, and
-      individual episodes. Supports resetting Kodi watch progress for a
-      fresh rewatch while keeping your full history safe in Chronicle.
-    </description>
-    <news>
-      v2.0.5 - Fix: the Chronicle URL field was silently missing from the
-               Connection settings page (only API Key showed). It combined an
-               empty &lt;default/&gt; with &lt;allowempty&gt;false&lt;/allowempty&gt;
-               -- a combination none of Kodi's own bundled add-ons use (empty
-               defaults always pair with allowempty=true there) -- which made
-               Kodi drop just that one setting from the rendered page instead
-               of erroring. Changed to allowempty=true; the addon's own code
-               already requires a non-empty URL before doing anything.
-      v2.0.4 - Fix: "This add-on can't be configured" when opening Settings.
-               settings.xml used version="2" with default="..." attributes and
-               no &lt;level&gt; element per setting -- this Kodi build only
-               recognizes the version="1" schema with &lt;default&gt; as a
-               child element and a required &lt;level&gt; child (confirmed
-               against Kodi's own bundled metadata.tvshows.themoviedb.org.python
-               and audioencoder.kodi.builtin.aac add-ons, both version="1").
-               Kodi silently treated the whole file as having no settings
-               rather than raising a parse error.
-      v2.0.3 - Fix: addon showed Kodi's generic fallback icon instead of the
-               Chronicle "C" in the add-on browser. icon.png was present at the
-               addon root but never declared via an &lt;assets&gt; block, which
-               this Kodi build requires explicitly rather than auto-detecting a
-               root-level icon.png (confirmed against script.simkl.scrobbler's
-               own addon.xml, which does declare it).
-      v2.0.2 - Fix: opening the addon before it's configured now jumps straight to
-               Settings (server URL + Connect to Chronicle), matching SIMKL
-               Scrobbler's first-run behavior, instead of showing an action menu
-               whose entries would all fail with nothing configured yet.
-      v2.0.1 - Fix: remove the xbmc.gui dependency declaration — it's not a real
-               resolvable addon on modern Kodi (GUI functionality ships bundled
-               with xbmc.python), and declaring it caused every install attempt
-               to fail with "dependency on xbmc.gui version 5.14.0 could not be
-               satisfied".
-      v2.0.0 - Bidirectional sync: ratings + art (Chronicle -> Kodi, source of
-               truth) and play count / last-played reconciliation (whichever
-               side is more recent wins) for movies, movie collections, TV
-               shows, and episodes. Scrobbling resolves/creates the Chronicle
-               media item automatically when Chronicle hasn't matched it yet.
-      v1.1.0 - QR code device authentication; sync Chronicle lists to Kodi playlists
-      v1.0.0 - Initial release
-    </news>
+    <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
+    <news>v2.0.6 - Fix: opening the addon once a URL was set but before connecting reopened Settings instead of the menu, making "Connect to Chronicle" unreachable without typing an API key by hand. The first-run check no longer also requires the key. Also flattened description/changelog text -- the XML source's line-wrapping indentation was being rendered literally in Kodi's add-on info screen.
+v2.0.5 - Fix: Chronicle URL field was silently missing from the Connection settings page (allowempty=false combined with an empty default made Kodi drop just that one setting).
+v2.0.4 - Fix: "This add-on can't be configured" when opening Settings (settings.xml used an unsupported schema variant).
+v2.0.3 - Fix: addon showed Kodi's generic fallback icon instead of the Chronicle "C" (icon.png wasn't declared via an &lt;assets&gt; block).
+v2.0.2 - Fix: opening the addon before it's configured now jumps straight to Settings instead of a menu that would only fail.
+v2.0.1 - Fix: removed the xbmc.gui dependency declaration, which isn't a real resolvable addon and broke every install.
+v2.0.0 - Bidirectional sync: ratings + art (Chronicle -> Kodi, source of truth) and play count / last-played reconciliation for movies, movie collections, TV shows, and episodes.
+v1.1.0 - QR code device authentication; sync Chronicle lists to Kodi playlists
+v1.0.0 - Initial release</news>
   </extension>
 
 </addon>
