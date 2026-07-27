@@ -225,6 +225,18 @@ msgctxt "#32079"
 msgid "Not configured yet — opening settings so you can enter your Chronicle server and connect."
 msgstr ""
 
+msgctxt "#32080"
+msgid "Status"
+msgstr ""
+
+msgctxt "#32081"
+msgid "Connected"
+msgstr ""
+
+msgctxt "#32082"
+msgid "Not connected"
+msgstr ""
+
 msgctxt "#32074"
 msgid "Sync (Chronicle -> Kodi)"
 msgstr ""

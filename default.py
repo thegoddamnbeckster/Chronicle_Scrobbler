@@ -28,16 +28,15 @@ ADDON = xbmcaddon.Addon()
 log   = Logger('default')
 
 
-def _has_url_configured():
-    """True once a server URL has been entered.
+def _is_configured():
+    """True once a server URL and API key are both present.
 
-    Deliberately does NOT also require an API key — the whole point of the
-    QR/PIN flow is that the key gets filled in *by* connecting, not before.
-    Requiring it here would make "Connect to Chronicle" unreachable: the menu
-    item that starts the auth flow would never show until auth had already
-    happened.
+    "Connect to Chronicle" lives as an action button on the Settings page
+    itself (resources/settings.xml), not in this menu — so requiring the key
+    here doesn't create a dead end: an unconfigured click goes straight to
+    Settings, where the URL field and the connect button sit side by side.
     """
-    return bool(ADDON.getSetting('chronicle_url'))
+    return bool(ADDON.getSetting('chronicle_url')) and bool(ADDON.getSetting('api_key'))
 
 
 def _get_args():
@@ -50,6 +49,15 @@ def _get_args():
     return args
 
 
+def _refresh_auth_status():
+    """Keep the read-only Settings status field honest before Settings is shown."""
+    connected = bool(ADDON.getSetting('api_key'))
+    ADDON.setSetting(
+        'auth_status',
+        ADDON.getLocalizedString(32081 if connected else 32082),  # "Connected" / "Not connected"
+    )
+
+
 def show_menu():
     """Display the main action menu, or jump straight to Settings on first run."""
     args = _get_args()
@@ -57,7 +65,8 @@ def show_menu():
         _connect_to_chronicle()
         return
 
-    if not _has_url_configured():
+    if not _is_configured():
+        _refresh_auth_status()
         xbmcgui.Dialog().notification(
             ADDON.getLocalizedString(32000),   # "Chronicle Scrobbler"
             ADDON.getLocalizedString(32079),   # "Not configured yet — opening settings…"
@@ -93,6 +102,7 @@ def show_menu():
     elif choice == 5:
         _sync_lists()
     elif choice == 6:
+        _refresh_auth_status()
         ADDON.openSettings()
 
 

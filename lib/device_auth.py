@@ -94,6 +94,7 @@ class DeviceAuthManager:
         api_key = api_key_holder[0]
         if api_key:
             ADDON.setSetting('api_key', api_key)
+            ADDON.setSetting('auth_status', ADDON.getLocalizedString(32081))  # "Connected"
             log.info('API key saved successfully')
             xbmcgui.Dialog().ok(
                 ADDON.getLocalizedString(32060),

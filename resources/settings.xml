@@ -1,114 +1,38 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<settings version="1">
-  <section id="service.chronicle.scrobbler">
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<settings>
 
-    <!-- ── Connection ─────────────────────────────────────────────────────────── -->
-    <category id="connection" label="32001">
-      <group id="1">
-
+    <!-- ============================================================================ -->
+    <!-- Connection -->
+    <!-- ============================================================================ -->
+    <category label="32001">
         <!-- No default here on purpose — Chronicle's address is unique per
-             install (LAN IP, hostname, or domain); a plausible-looking
-             default risks silently pointing at the wrong thing. -->
-        <setting id="chronicle_url" type="string" label="32002">
-          <level>0</level>
-          <default/>
-          <constraints>
-            <allowempty>true</allowempty>
-          </constraints>
-          <control type="edit" format="string"/>
-        </setting>
-
-        <setting id="api_key" type="string" label="32003" secure="true">
-          <level>0</level>
-          <default/>
-          <constraints>
-            <allowempty>true</allowempty>
-          </constraints>
-          <control type="edit" format="string"/>
-        </setting>
-
-      </group>
+             install (LAN IP, hostname, or domain, plus port); a plausible-
+             looking default risks silently pointing at the wrong thing. -->
+        <setting id="chronicle_url" type="text" label="32002" default=""/>
+        <setting id="authorization" type="action" label="32061" action="RunScript(service.chronicle.scrobbler,action=auth)"/>
+        <setting id="auth_status" type="text" label="32080" enable="false" default=""/>
+        <!-- Set automatically by the QR/PIN flow above — not meant to be typed by hand -->
+        <setting id="api_key" type="text" label="32003" visible="false"/>
     </category>
 
-    <!-- ── Scrobbling ─────────────────────────────────────────────────────── -->
-    <category id="scrobbling" label="32004">
-
-      <group id="2">
-
-        <setting id="watched_threshold" type="integer" label="32006">
-          <level>0</level>
-          <default>80</default>
-          <constraints>
-            <minimum>50</minimum>
-            <step>5</step>
-            <maximum>100</maximum>
-          </constraints>
-          <control type="slider" format="integer"/>
-        </setting>
-
-        <setting id="poll_interval" type="integer" label="32007">
-          <level>0</level>
-          <default>30</default>
-          <constraints>
-            <minimum>15</minimum>
-            <step>5</step>
-            <maximum>120</maximum>
-          </constraints>
-          <control type="slider" format="integer"/>
-        </setting>
-
-      </group>
-
-      <group id="3">
-
-        <setting id="scrobble_movies" type="boolean" label="32009">
-          <level>0</level>
-          <default>true</default>
-          <control type="toggle"/>
-        </setting>
-
-        <setting id="scrobble_tv" type="boolean" label="32015">
-          <level>0</level>
-          <default>true</default>
-          <control type="toggle"/>
-        </setting>
-
-        <setting id="scrobble_music" type="boolean" label="32016">
-          <level>0</level>
-          <default>false</default>
-          <control type="toggle"/>
-        </setting>
-
-      </group>
-
+    <!-- ============================================================================ -->
+    <!-- Scrobbling -->
+    <!-- ============================================================================ -->
+    <category label="32004">
+        <setting id="watched_threshold" type="slider" label="32006" default="80" range="50,5,100" option="int"/>
+        <setting id="poll_interval" type="slider" label="32007" default="30" range="15,5,120" option="int"/>
+        <setting id="scrobble_movies" type="bool" label="32009" default="true"/>
+        <setting id="scrobble_tv" type="bool" label="32015" default="true"/>
+        <setting id="scrobble_music" type="bool" label="32016" default="false"/>
     </category>
 
-    <!-- ── Sync (Chronicle -> Kodi) ───────────────────────────────────────── -->
-    <category id="sync" label="32074">
-
-      <group id="4">
-
-        <setting id="sync_ratings" type="boolean" label="32076">
-          <level>0</level>
-          <default>true</default>
-          <control type="toggle"/>
-        </setting>
-
-        <setting id="sync_art" type="boolean" label="32077">
-          <level>0</level>
-          <default>true</default>
-          <control type="toggle"/>
-        </setting>
-
-        <setting id="sync_playcount" type="boolean" label="32078">
-          <level>0</level>
-          <default>true</default>
-          <control type="toggle"/>
-        </setting>
-
-      </group>
-
+    <!-- ============================================================================ -->
+    <!-- Sync (Chronicle -> Kodi) -->
+    <!-- ============================================================================ -->
+    <category label="32074">
+        <setting id="sync_ratings" type="bool" label="32076" default="true"/>
+        <setting id="sync_art" type="bool" label="32077" default="true"/>
+        <setting id="sync_playcount" type="bool" label="32078" default="true"/>
     </category>
 
-  </section>
 </settings>
