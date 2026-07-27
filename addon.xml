@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.0.8"
+       version="2.0.9"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,8 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.0.8 - Fix: the QR connect dialog had no background at all -- WindowDialog is transparent by default and no control was ever drawn behind the text/QR image, so the Settings page underneath showed straight through, making both illegible. Added a dimmed full-screen backdrop plus an opaque card panel behind the dialog's own controls.
+    <news>v2.0.9 - Fix: QR image still didn't show even after the server started returning a valid PNG. Every attempt downloaded to the same fixed filename (chronicle_qr.png); Kodi's texture manager caches loaded images by path for the session, so it kept showing whatever it first loaded there regardless of the file being overwritten on disk. Each attempt now downloads to a filename unique to its device-auth code.
+v2.0.8 - Fix: the QR connect dialog had no background at all -- WindowDialog is transparent by default and no control was ever drawn behind the text/QR image, so the Settings page underneath showed straight through, making both illegible. Added a dimmed full-screen backdrop plus an opaque card panel behind the dialog's own controls.
 v2.0.7 - Rebuilt Settings to match SIMKL Scrobbler's layout: Connection tab now leads with the Chronicle URL field followed directly by a "Connect to Chronicle" QR/PIN button and a read-only status line, so connecting never requires typing an API key by hand. settings.xml also switched to the classic flat schema (proven against SIMKL's own real, working settings.xml) instead of the newer section/group schema, since that's what supports an in-page action button. Unconfigured clicks go straight to this Settings page again, matching SIMKL's own first-run behavior.
 v2.0.6 - Fix: opening the addon once a URL was set but before connecting reopened Settings instead of the menu, making "Connect to Chronicle" unreachable without typing an API key by hand. The first-run check no longer also requires the key. Also flattened description/changelog text -- the XML source's line-wrapping indentation was being rendered literally in Kodi's add-on info screen.
 v2.0.5 - Fix: Chronicle URL field was silently missing from the Connection settings page (allowempty=false combined with an empty default made Kodi drop just that one setting).

@@ -31,7 +31,6 @@ ADDON = xbmcaddon.Addon()
 log   = Logger('device_auth')
 
 _POLL_INTERVAL = 5      # seconds between polls
-_QR_TEMP_PATH  = xbmcvfs.translatePath('special://temp/chronicle_qr.png')
 
 
 class DeviceAuthManager:
@@ -63,7 +62,11 @@ class DeviceAuthManager:
         log.info('Device auth initiated — display code: {0}'.format(display_code))
 
         # ── 2. Download QR image ────────────────────────────────────────────
-        qr_path = self._download_qr(qr_url)
+        # Filename includes the code so every attempt gets a fresh path -- Kodi's
+        # texture manager caches loaded images in memory by path for the session,
+        # so reusing one fixed filename kept showing whatever was first loaded
+        # there even after the file on disk had been overwritten with new bytes.
+        qr_path = self._download_qr(qr_url, code)
 
         # ── 3. Start polling thread ─────────────────────────────────────────
         api_key_holder = [None]   # shared result slot
@@ -130,8 +133,11 @@ class DeviceAuthManager:
             log.error('Device auth initiation failed: {0}'.format(exc))
             return None
 
-    def _download_qr(self, qr_url: str) -> str:
-        """Download QR PNG to a temp file and return the local path (or empty string on failure)."""
+    def _download_qr(self, qr_url: str, code: str) -> str:
+        """Download QR PNG to a temp file unique to this code, return the local path (or '' on failure)."""
+        qr_temp_path = xbmcvfs.translatePath(
+            'special://temp/chronicle_qr_{0}.png'.format(code[:16])
+        )
         try:
             req = urllib.request.Request(
                 qr_url,
@@ -140,11 +146,11 @@ class DeviceAuthManager:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = resp.read()
 
-            with open(_QR_TEMP_PATH, 'wb') as f:
+            with open(qr_temp_path, 'wb') as f:
                 f.write(data)
 
-            log.debug('QR image downloaded to {0}'.format(_QR_TEMP_PATH))
-            return _QR_TEMP_PATH
+            log.debug('QR image downloaded to {0}'.format(qr_temp_path))
+            return qr_temp_path
         except Exception as exc:
             log.warning('QR download failed: {0}'.format(exc))
             return ''
