@@ -6,6 +6,7 @@ A background thread watches the stop_event; when it fires the dialog updates
 its status label and closes itself automatically.
 """
 
+import os
 import threading
 
 import xbmc
@@ -14,8 +15,14 @@ import xbmcaddon
 
 from lib.logger import Logger
 
-ADDON = xbmcaddon.Addon()
-log   = Logger('qr_dialog')
+ADDON      = xbmcaddon.Addon()
+ADDON_PATH = ADDON.getAddonInfo('path')
+log        = Logger('qr_dialog')
+
+# Solid backing panel — WindowDialog itself is fully transparent, so without
+# an image control behind everything else the QR card just floats over
+# whatever's on screen (Settings, in this case) with no way to read either.
+PANEL_PATH = os.path.join(ADDON_PATH, 'resources', 'qr_panel.png')
 
 # Kodi action IDs
 ACTION_PREVIOUS_MENU = 10
@@ -78,6 +85,18 @@ class QRDialog(xbmcgui.WindowDialog):
         cx = CARD_X
         cw = CARD_W
         y  = CARD_Y + 22
+
+        # Dim the whole screen first, then draw the opaque card on top of that —
+        # both added before any text/QR controls so nothing behind the dialog
+        # (e.g. the Settings page that opened it) shows through either layer.
+        self.addControl(xbmcgui.ControlImage(
+            0, 0, SCR_W, SCR_H,
+            PANEL_PATH, colorDiffuse='B3000000',
+        ))
+        self.addControl(xbmcgui.ControlImage(
+            CARD_X, CARD_Y, CARD_W, CARD_H,
+            PANEL_PATH,
+        ))
 
         # Title
         self.addControl(xbmcgui.ControlLabel(
