@@ -134,10 +134,20 @@ class DeviceAuthManager:
             return None
 
     def _download_qr(self, qr_url: str, code: str) -> str:
-        """Download QR PNG to a temp file unique to this code, return the local path (or '' on failure)."""
-        qr_temp_path = xbmcvfs.translatePath(
-            'special://temp/chronicle_qr_{0}.png'.format(code[:16])
-        )
+        """Download QR PNG to a temp file unique to this code, return its special:// VFS
+        path (or '' on failure) -- NOT the translated real filesystem path.
+
+        translatePath() is needed for Python's own open() below, since it can't write
+        through a special:// URL directly. But everything downstream (ControlImage) is
+        Kodi's own GUI/texture layer, which is documented to expect special:// notation;
+        the addon's own bundled images (panel, buttons) render fine referenced that way,
+        while this file -- previously handed to ControlImage as the translated raw OS
+        path -- rendered as nothing despite being confirmed valid, unique-per-attempt,
+        real-color-type PNG data on disk. Untranslated special:// is the one remaining
+        difference between the two.
+        """
+        vfs_path  = 'special://temp/chronicle_qr_{0}.png'.format(code[:16])
+        real_path = xbmcvfs.translatePath(vfs_path)
         try:
             req = urllib.request.Request(
                 qr_url,
@@ -146,11 +156,11 @@ class DeviceAuthManager:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = resp.read()
 
-            with open(qr_temp_path, 'wb') as f:
+            with open(real_path, 'wb') as f:
                 f.write(data)
 
-            log.debug('QR image downloaded to {0}'.format(qr_temp_path))
-            return qr_temp_path
+            log.debug('QR image downloaded to {0}'.format(real_path))
+            return vfs_path
         except Exception as exc:
             log.warning('QR download failed: {0}'.format(exc))
             return ''
