@@ -22,7 +22,15 @@ log        = Logger('qr_dialog')
 # Solid backing panel — WindowDialog itself is fully transparent, so without
 # an image control behind everything else the QR card just floats over
 # whatever's on screen (Settings, in this case) with no way to read either.
-PANEL_PATH = os.path.join(ADDON_PATH, 'resources', 'qr_panel.png')
+PANEL_PATH      = os.path.join(ADDON_PATH, 'resources', 'qr_panel.png')
+
+# Plain ControlButton with no explicit textures/colors falls back to whatever
+# the active Kodi skin considers its default button look -- on this skin that
+# turned out to be a light/washed-out background with white text, unreadable,
+# with the label not even fitting the box. Explicit solid textures + a fixed
+# white text color make the button's appearance ours, not the skin's.
+BTN_NORMAL_PATH = os.path.join(ADDON_PATH, 'resources', 'btn_normal.png')
+BTN_FOCUS_PATH  = os.path.join(ADDON_PATH, 'resources', 'btn_focus.png')
 
 # Kodi action IDs
 ACTION_PREVIOUS_MENU = 10
@@ -159,11 +167,19 @@ class QRDialog(xbmcgui.WindowDialog):
         y += 40
 
         # Cancel button
-        btn_w = 130
+        btn_w = 180
+        btn_h = 44
         btn_x = cx + (cw - btn_w) // 2
         cancel_btn = xbmcgui.ControlButton(
-            btn_x, y, btn_w, 38,
+            btn_x, y, btn_w, btn_h,
             ADDON.getLocalizedString(32069),   # "Cancel"
+            font='font12',
+            textColor='FFFFFFFF',
+            focusedColor='FFFFFFFF',
+            disabledColor='FF999999',
+            alignment=2 | 4,   # centered horizontally and vertically
+            focusTexture=BTN_FOCUS_PATH,
+            noFocusTexture=BTN_NORMAL_PATH,
         )
         self.addControl(cancel_btn)
         self.setFocus(cancel_btn)
