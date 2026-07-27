@@ -1,23 +1,29 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<settings version="2">
+<settings version="1">
+  <section id="service.chronicle.scrobbler">
 
-  <!-- ── Connection ─────────────────────────────────────────────────────────── -->
-  <section id="connection">
-
+    <!-- ── Connection ─────────────────────────────────────────────────────────── -->
     <category id="connection" label="32001">
-      <group id="1" label="32001">
+      <group id="1">
 
         <!-- No default here on purpose — Chronicle's address is unique per
              install (LAN IP, hostname, or domain); a plausible-looking
              default risks silently pointing at the wrong thing. -->
-        <setting id="chronicle_url" type="string" label="32002" default="">
-          <control type="edit" format="string"/>
+        <setting id="chronicle_url" type="string" label="32002">
+          <level>0</level>
+          <default/>
           <constraints>
             <allowempty>false</allowempty>
           </constraints>
+          <control type="edit" format="string"/>
         </setting>
 
-        <setting id="api_key" type="string" label="32003" default="" secure="true">
+        <setting id="api_key" type="string" label="32003" secure="true">
+          <level>0</level>
+          <default/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
           <control type="edit" format="string"/>
         </setting>
 
@@ -27,31 +33,49 @@
     <!-- ── Scrobbling ─────────────────────────────────────────────────────── -->
     <category id="scrobbling" label="32004">
 
-      <group id="2" label="32005">
+      <group id="2">
 
-        <setting id="watched_threshold" type="integer" label="32006" default="80">
-          <range start="50" step="5" end="100"/>
+        <setting id="watched_threshold" type="integer" label="32006">
+          <level>0</level>
+          <default>80</default>
+          <constraints>
+            <minimum>50</minimum>
+            <step>5</step>
+            <maximum>100</maximum>
+          </constraints>
           <control type="slider" format="integer"/>
         </setting>
 
-        <setting id="poll_interval" type="integer" label="32007" default="30">
-          <range start="15" step="5" end="120"/>
+        <setting id="poll_interval" type="integer" label="32007">
+          <level>0</level>
+          <default>30</default>
+          <constraints>
+            <minimum>15</minimum>
+            <step>5</step>
+            <maximum>120</maximum>
+          </constraints>
           <control type="slider" format="integer"/>
         </setting>
 
       </group>
 
-      <group id="3" label="32008">
+      <group id="3">
 
-        <setting id="scrobble_movies" type="boolean" label="32009" default="true">
+        <setting id="scrobble_movies" type="boolean" label="32009">
+          <level>0</level>
+          <default>true</default>
           <control type="toggle"/>
         </setting>
 
-        <setting id="scrobble_tv" type="boolean" label="32015" default="true">
+        <setting id="scrobble_tv" type="boolean" label="32015">
+          <level>0</level>
+          <default>true</default>
           <control type="toggle"/>
         </setting>
 
-        <setting id="scrobble_music" type="boolean" label="32016" default="false">
+        <setting id="scrobble_music" type="boolean" label="32016">
+          <level>0</level>
+          <default>false</default>
           <control type="toggle"/>
         </setting>
 
@@ -62,17 +86,23 @@
     <!-- ── Sync (Chronicle -> Kodi) ───────────────────────────────────────── -->
     <category id="sync" label="32074">
 
-      <group id="4" label="32075">
+      <group id="4">
 
-        <setting id="sync_ratings" type="boolean" label="32076" default="true">
+        <setting id="sync_ratings" type="boolean" label="32076">
+          <level>0</level>
+          <default>true</default>
           <control type="toggle"/>
         </setting>
 
-        <setting id="sync_art" type="boolean" label="32077" default="true">
+        <setting id="sync_art" type="boolean" label="32077">
+          <level>0</level>
+          <default>true</default>
           <control type="toggle"/>
         </setting>
 
-        <setting id="sync_playcount" type="boolean" label="32078" default="true">
+        <setting id="sync_playcount" type="boolean" label="32078">
+          <level>0</level>
+          <default>true</default>
           <control type="toggle"/>
         </setting>
 
@@ -81,5 +111,4 @@
     </category>
 
   </section>
-
 </settings>
