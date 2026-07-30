@@ -19,11 +19,13 @@ Background thread:
     • watched-threshold crossing (one-shot per session)
 """
 
+import json
 import threading
 import time
 
 import xbmc
 import xbmcaddon
+import xbmcvfs
 
 from lib.logger import Logger
 from lib.chronicle_client import ChronicleClient
@@ -36,6 +38,12 @@ log   = Logger('monitor')
 # Seconds the poll thread sleeps between iterations.
 # Keep this shorter than MIN_INTERVAL so we never miss a threshold crossing.
 _POLL_SLEEP = 5
+
+# Minimum gap between VideoLibrary.Clean runs -- see onScanFinished(). Clean is
+# safe and idempotent to re-run, this just avoids back-to-back thrashing when
+# multiple scans fire in quick succession (confirmed happens in practice: two
+# scans 50s apart from a single content-settings toggle).
+_CLEAN_THROTTLE_SECONDS = 120
 
 
 class ChronicleMonitor(xbmc.Monitor):
@@ -92,6 +100,28 @@ class ChronicleMonitor(xbmc.Monitor):
         log.info('Settings changed — reloading client')
         with self._lock:
             self._client = ChronicleClient()
+
+    def onScanFinished(self, library):
+        """Fires whenever ANY video library scan completes -- confirmed via direct
+        testing that this is the one hook common to every trigger path: a manual
+        "Set Content" toggle refresh, Kodi's own automatic startup scan, and a
+        scheduled scan all reach it identically, since Kodi's C++ core fires this
+        the same way regardless of what asked for the scan. That's exactly why this
+        is where library cleanup belongs, instead of trying to special-case each
+        trigger individually (which isn't reliably distinguishable from the addon
+        side at all -- there's no per-trigger marker in Kodi's own logging either).
+
+        Runs VideoLibrary.Clean so items whose files were moved or removed (e.g.
+        after a NAS storage rebalance) get purged from the library instead of
+        leaving stale paths behind -- a stale path makes Kodi's own scanner skip
+        that item on every future scan without ever handing it to our metadata
+        scraper again, which is what silently broke art/collection syncing for
+        titles that had genuinely moved to a different share.
+        """
+        if library != 'video':
+            return
+        log.info('onScanFinished(video) -- checking whether to run VideoLibrary.Clean')
+        self._maybe_clean_video_library()
 
     # ── service entry point ────────────────────────────────────────────────────
 
@@ -171,6 +201,48 @@ class ChronicleMonitor(xbmc.Monitor):
                 log.error('Poll error: {0}'.format(exc))
             self._stop_event.wait(_POLL_SLEEP)
         log.debug('Poll loop stopped')
+
+    @staticmethod
+    def _clean_marker_path() -> str:
+        return xbmcvfs.translatePath(ADDON.getAddonInfo('profile') + 'last_video_clean.txt')
+
+    def _maybe_clean_video_library(self) -> None:
+        """Runs VideoLibrary.Clean, throttled -- see onScanFinished() and
+        _CLEAN_THROTTLE_SECONDS for why this exists and why the throttle is safe."""
+        marker = self._clean_marker_path()
+        try:
+            if xbmcvfs.exists(marker):
+                f = xbmcvfs.File(marker, 'r')
+                try:
+                    last_run = float(f.read() or '0')
+                finally:
+                    f.close()
+                if time.time() - last_run < _CLEAN_THROTTLE_SECONDS:
+                    log.debug('Skipping VideoLibrary.Clean -- ran recently')
+                    return
+        except Exception as exc:
+            log.warning("Couldn't read Clean Library throttle marker: {0}".format(exc))
+
+        try:
+            response = xbmc.executeJSONRPC(json.dumps({
+                'jsonrpc': '2.0',
+                'id': 1,
+                'method': 'VideoLibrary.Clean',
+                'params': {'showdialog': False},
+            }))
+            log.info('VideoLibrary.Clean triggered: {0}'.format(response))
+        except Exception as exc:
+            log.error("Couldn't trigger VideoLibrary.Clean: {0}".format(exc))
+            return
+
+        try:
+            f = xbmcvfs.File(marker, 'w')
+            try:
+                f.write(bytearray(str(time.time()), 'utf-8'))
+            finally:
+                f.close()
+        except Exception as exc:
+            log.warning("Couldn't write Clean Library throttle marker: {0}".format(exc))
 
     @staticmethod
     def _should_scrobble_type(media_type: str) -> bool:
