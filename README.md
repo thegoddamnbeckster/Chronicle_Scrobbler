@@ -10,7 +10,7 @@ plus a full bidirectional data-parity sync SIMKL's own addon doesn't have a Chro
 equivalent for.
 
 **Addon ID:** `service.chronicle.scrobbler`
-**Version:** 2.0.0
+**Version:** 2.0.16
 **Kodi:** 19 "Matrix" and later (JSON-RPC API v12+)
 **Auth:** QR code device authentication (no password typed into Kodi)
 
@@ -160,6 +160,17 @@ Episodes use a different Kodi art model — confirmed live against a real Kodi 2
 library: an episode's own art is just `thumb` (its still/screenshot); `poster`/`fanart`
 only exist as `tvshow.poster`/`tvshow.fanart` (inherited from the show, not independently
 overwritable per-episode).
+
+## Since 2.0.0
+
+A run of stability fixes on top of the Phase 1 release: the device-auth QR flow now
+actually renders reliably (several fixes to VFS path handling, PNG color type, and
+per-attempt cache-busting filenames), the connect dialog got a real backdrop and
+styled buttons, device names sent to Chronicle prefer the machine's real hostname
+over Kodi's own arbitrary FriendlyName, and `VideoLibrary.Clean` now runs
+automatically after a scan — Kodi's "Set Content" re-scan toggle alone doesn't clear
+stale (moved/renamed/deleted) library entries. See `addon.xml`'s own `<news>` block
+for the full per-version changelog.
 
 ## Known Limitations (Phase 1)
 
