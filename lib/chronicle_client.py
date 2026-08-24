@@ -98,6 +98,39 @@ class ChronicleClient:
             log.error('get_watch_summary({0}) failed: {1}'.format(media_item_id, exc))
             return empty
 
+    def get_resume_state(self, payload: dict) -> dict:
+        """POST /api/v1/scrobble/resume — the cross-device "resume where I left off"
+        check, called on playback start before this device has any local resume
+        bookmark of its own for the item.
+
+        payload keys match Chronicle.API's ResumeLookupRequestDto -- the same
+        identifying subset scrobble() takes (mediaItemId OR
+        title/year/mediaType/externalIds), just without progressPercent/timestamp/
+        deviceName, which don't mean anything for a lookup.
+
+        Returns {} when there's nothing to resume (item never seen, already fully
+        watched, or the request/lookup failed) -- deliberately the same empty shape
+        for "not found" as for "found nothing to resume", matching what the server
+        itself does (see ScrobbleController.GetResumeState's own doc): a caller
+        checking whether to seek on playback start only needs "is there a position",
+        not why not. Otherwise {'mediaItemId': int, 'resumePositionPercent': float,
+        'resumeUpdatedAt': iso-str|None}.
+        """
+        if not self._base_url or not self._api_key:
+            return {}
+
+        url  = '{0}/api/v1/scrobble/resume'.format(self._base_url)
+        data = json.dumps(payload).encode('utf-8')
+        req  = self._build_request(url, data=data, method='POST')
+
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                body = json.loads(resp.read().decode('utf-8'))
+                return body.get('data') or {}
+        except Exception as exc:
+            log.error('get_resume_state failed: {0}'.format(exc))
+            return {}
+
     def get_media(self, media_id: int) -> dict:
         """GET /api/v1/media/{id} — full MediaItemDto, including Ancestors.
 
