@@ -228,6 +228,17 @@ class MediaInfo:
             'deviceName':      'Kodi',
         }
 
+    def to_resume_lookup_payload(self) -> dict:
+        """Build the Chronicle POST /api/v1/scrobble/resume request body -- the same
+        identifying fields as to_scrobble_payload(), minus progressPercent/deviceName,
+        which don't mean anything for a lookup rather than an event."""
+        return {
+            'mediaType':   self.media_type,
+            'title':       self.show_title if self.media_type == 'episode' else self.title,
+            'year':        self.year,
+            'externalIds': self.external_ids,
+        }
+
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
