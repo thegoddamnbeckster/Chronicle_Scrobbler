@@ -79,6 +79,13 @@ class ChroniclePlayer(xbmc.Player):
         self._client  = client
         self._tracker = tracker
         self._lock    = lock
+        # Kodi fires BOTH onPlayBackStarted and onAVStarted for video (only the former
+        # fires for audio) -- guards _on_start() so a video session doesn't start twice,
+        # double-send the opening scrobble, and double-query the resume endpoint.
+        self._session_started = False
+        # True while a scrobble POST is in flight -- prevents the poll thread and a
+        # Kodi callback thread from both sending a scrobble for the same moment.
+        self._sending = False
 
     # ── xbmc.Player callbacks ──────────────────────────────────────────────────
 
@@ -133,14 +140,34 @@ class ChroniclePlayer(xbmc.Player):
             return
 
         with self._lock:
+            if self._session_started:
+                # onPlayBackStarted and onAVStarted both fire for video -- the first
+                # one through already started this session.
+                return
+            self._session_started = True
             self._tracker.start_session(media)
 
-        self._maybe_resume_from_chronicle(media)
+        # The resume lookup is a real network call (see _maybe_resume_from_chronicle) --
+        # run it on a background thread so a slow/unreachable Chronicle server never
+        # stalls Kodi's player-callback dispatch thread. Mirrors the pattern already
+        # established elsewhere in this addon for backgrounding blocking network calls
+        # (lib/device_auth.py's poll_thread, lib/qr_dialog.py's _monitor_thread).
+        threading.Thread(
+            target=self._start_session_async, args=(media,),
+            name='ChronicleScrobbler-SessionStart', daemon=True,
+        ).start()
 
-        # Immediately send an opening scrobble (progress ≈ 0 %)
-        self._send_update()
+    def _start_session_async(self, media) -> None:
+        resumed = self._maybe_resume_from_chronicle(media)
+        # Only send the immediate "opening ≈0%" scrobble when nothing was just resumed --
+        # xbmc.Player.seekTime() isn't guaranteed synchronous, so sending right after a
+        # resume-seek risks reporting Chronicle a stale near-0% position that overwrites
+        # the very resume state it just told this device about. The next poll tick
+        # (within _POLL_SLEEP seconds) reports the real, post-seek position instead.
+        if not resumed:
+            self._send_update()
 
-    def _maybe_resume_from_chronicle(self, media) -> None:
+    def _maybe_resume_from_chronicle(self, media) -> bool:
         """The whole cross-device point of this addon: if a DIFFERENT device left
         this item partway through, pick up from there on this one. Only when Kodi
         itself has no local resume bookmark for this item -- if it does, that's
@@ -148,30 +175,39 @@ class ChroniclePlayer(xbmc.Player):
         answer for "where was I" than a cross-device value that's necessarily a bit
         stale (only as fresh as the last scrobble Chronicle received), so it wins
         without even asking Chronicle.
+
+        Returns True if a resume seek was actually performed.
         """
         if media.resume_position > 0:
             log.debug('Kodi already has a local resume bookmark for this item — not asking Chronicle')
-            return
+            return False
         if media.total_time <= 0:
             log.debug('No total duration known yet — cannot convert a resume percent to a seek position')
-            return
+            return False
 
         state = self._client.get_resume_state(media.to_resume_lookup_payload())
+        if not isinstance(state, dict):
+            log.warning('Unexpected resume-state response shape: {0!r}'.format(state))
+            return False
+
         percent = state.get('resumePositionPercent')
-        if not percent:
-            return
+        if not isinstance(percent, (int, float)) or percent <= 0:
+            return False
 
         seconds = (percent / 100.0) * media.total_time
         try:
             self.seekTime(seconds)
             log.info('Resumed from Chronicle: {0:.1f}% ({1:.0f}s of {2:.0f}s)'.format(
                      percent, seconds, media.total_time))
+            return True
         except Exception as exc:
             log.warning("Couldn't seek to Chronicle's resume position: {0}".format(exc))
+            return False
 
     def _on_stop(self) -> None:
         """End the current scrobble session."""
         with self._lock:
+            self._session_started = False
             self._tracker.end_session()
 
     def _send_update(self, force: bool = False) -> None:
@@ -182,15 +218,24 @@ class ChroniclePlayer(xbmc.Player):
 
         now = time.monotonic()
         with self._lock:
-            if not self._tracker.has_session:
+            # should_scrobble()/record_scrobble() are split across the unlocked network
+            # call below -- without this guard, the poll thread (every _POLL_SLEEP
+            # seconds) and a Kodi callback thread (e.g. onPlayBackSeek) can both pass
+            # the gate before either records, sending duplicate scrobbles for the same
+            # moment. Only one send is ever in flight per session.
+            if not self._tracker.has_session or self._sending:
                 return
-            if force or self._tracker.should_scrobble(media, now):
-                payload = media.to_scrobble_payload()
-            else:
+            if not (force or self._tracker.should_scrobble(media, now)):
                 return
+            payload = media.to_scrobble_payload()
+            self._sending = True
 
-        # Send outside the lock to avoid blocking callbacks
-        ok = self._client.scrobble(payload)
+        try:
+            # Send outside the lock to avoid blocking callbacks
+            ok = self._client.scrobble(payload)
+        finally:
+            with self._lock:
+                self._sending = False
         if ok:
             with self._lock:
                 self._tracker.record_scrobble(media, now)
