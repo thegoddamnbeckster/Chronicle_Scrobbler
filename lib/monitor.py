@@ -48,6 +48,7 @@ import time
 
 import xbmc
 import xbmcaddon
+import xbmcgui
 import xbmcvfs
 
 from lib.logger import Logger
@@ -67,6 +68,13 @@ _POLL_SLEEP = 5
 # multiple scans fire in quick succession (confirmed happens in practice: two scans
 # 50s apart from a single content-settings toggle).
 _CLEAN_THROTTLE_SECONDS = 120
+
+# Cross-addon signal directory: this addon (Chronicle_Scrobbler) writes one file here
+# per watched session, and the separate script.chronicle.rating addon's own background
+# service watches it and prompts for a rating. special://temp/ (not addon_data/) so it's
+# reachable from both addons' own processes regardless of addon id -- same pattern
+# Chronicle_Scraper already uses for its own scraper<->service coordination.
+_RATING_SIGNAL_DIR = 'special://temp/chronicle_scrobbler/'
 
 
 class ChroniclePlayer(xbmc.Player):
@@ -147,6 +155,8 @@ class ChroniclePlayer(xbmc.Player):
             self._session_started = True
             self._tracker.start_session(media)
 
+        self._notify(ADDON.getLocalizedString(32088).format(self._display_title(media)))
+
         # The resume lookup is a real network call (see _maybe_resume_from_chronicle) --
         # run it on a background thread so a slow/unreachable Chronicle server never
         # stalls Kodi's player-callback dispatch thread. Mirrors the pattern already
@@ -208,7 +218,45 @@ class ChroniclePlayer(xbmc.Player):
         """End the current scrobble session."""
         with self._lock:
             self._session_started = False
+            state = self._tracker.snapshot()   # before end_session() clears it
             self._tracker.end_session()
+
+        if state is not None and state.watched_sent:
+            self._write_rating_signal(state)
+
+    def _write_rating_signal(self, state) -> None:
+        """Drops a small JSON file for the separate Chronicle Rating add-on's own
+        background service to pick up and prompt from -- see that addon's service.py.
+        Written only when this session actually crossed the watched threshold (state.
+        watched_sent), never for a session abandoned a few minutes in.
+
+        One uniquely-named file per session, not a single fixed path -- back-to-back
+        sessions (binge-watching several episodes in a row) would otherwise race to
+        overwrite the same file before the rating add-on's poll loop got to the
+        previous one, silently dropping a prompt. The rating add-on deletes each file
+        once it's shown that prompt (or decided not to), so this directory only ever
+        holds genuinely pending items.
+        """
+        try:
+            xbmcvfs.mkdirs(_RATING_SIGNAL_DIR)
+            payload = {
+                'title':        state.show_title if state.media_type == 'episode' else state.title,
+                'displayTitle': self._display_title(state),
+                'mediaType':    state.media_type,
+                'season':       state.season,
+                'episode':      state.episode,
+                'externalIds':  state.external_ids,
+            }
+            path = '{0}rating_{1}_{2}.json'.format(
+                _RATING_SIGNAL_DIR, int(time.time() * 1000), threading.get_ident())
+            f = xbmcvfs.File(path, 'w')
+            try:
+                f.write(bytearray(json.dumps(payload), 'utf-8'))
+            finally:
+                f.close()
+            log.info('Wrote rating signal for "{0}" -> {1}'.format(payload['displayTitle'], path))
+        except Exception as exc:
+            log.warning('Could not write rating signal: {0}'.format(exc))
 
     def _send_update(self, force: bool = False) -> None:
         """Send a scrobble if the tracker decides one is due."""
@@ -238,7 +286,28 @@ class ChroniclePlayer(xbmc.Player):
                 self._sending = False
         if ok:
             with self._lock:
-                self._tracker.record_scrobble(media, now)
+                just_watched = self._tracker.record_scrobble(media, now)
+            if just_watched:
+                self._notify(ADDON.getLocalizedString(32089).format(self._display_title(media)))
+
+    @staticmethod
+    def _display_title(media) -> str:
+        if media.media_type == 'episode' and media.show_title:
+            return '{0} S{1:02d}E{2:02d}'.format(media.show_title, media.season, media.episode)
+        return media.title or media.show_title or ''
+
+    @staticmethod
+    def _notify(message: str) -> None:
+        """On-screen toast for scrobble start/watched events -- gated by its own
+        setting (default on) since some users would rather scrobbling stay silent."""
+        if not ADDON.getSettingBool('show_notifications'):
+            return
+        xbmcgui.Dialog().notification(
+            ADDON.getLocalizedString(32000),   # "Chronicle Scrobbler"
+            message,
+            xbmcgui.NOTIFICATION_INFO,
+            4000,
+        )
 
     @staticmethod
     def _should_scrobble_type(media_type: str) -> bool:

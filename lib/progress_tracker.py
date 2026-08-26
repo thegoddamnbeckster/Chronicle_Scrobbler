@@ -55,6 +55,12 @@ class ProgressTracker:
     def has_session(self) -> bool:
         return self._state is not None
 
+    def snapshot(self) -> Optional[PlaybackState]:
+        """The current session's state, or None -- for a caller that needs session info
+        at the exact moment it ends (e.g. the rating add-on's signal file, which needs
+        to know whether watched_sent was ever set), taken before end_session() clears it."""
+        return self._state
+
     def start_session(self, media_info) -> None:
         """Called when playback of a new item begins."""
         self._state = PlaybackState(
@@ -110,17 +116,26 @@ class ProgressTracker:
 
         return False
 
-    def record_scrobble(self, media_info, now: float = None) -> None:
-        """Update internal state after a scrobble has been successfully sent."""
+    def record_scrobble(self, media_info, now: float = None) -> bool:
+        """Update internal state after a scrobble has been successfully sent.
+
+        Returns True exactly once per session -- the call where the watched
+        threshold is first crossed -- so callers (e.g. the on-screen "marked
+        as watched" notification) can react to that transition without
+        duplicating the threshold read or reaching into _state directly.
+        """
         if self._state is None:
-            return
+            return False
         if now is None:
             now = time.monotonic()
 
         threshold = float(ADDON.getSetting('watched_threshold') or 80)
-        if media_info.percentage >= threshold:
+        just_crossed_watched = False
+        if not self._state.watched_sent and media_info.percentage >= threshold:
             self._state.watched_sent = True
+            just_crossed_watched = True
 
         self._state.last_percentage = media_info.percentage
         self._last_scrobble         = now
         log.debug('Scrobble recorded @ {0:.1f}%'.format(media_info.percentage))
+        return just_crossed_watched

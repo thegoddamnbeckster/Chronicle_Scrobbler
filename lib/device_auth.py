@@ -13,7 +13,6 @@ DeviceAuthController):
   6. When denied/expired, show error and close
 """
 
-import socket
 import threading
 import time
 import json
@@ -26,6 +25,7 @@ import xbmcaddon
 
 from lib.logger import Logger
 from lib.chronicle_client import ChronicleClient
+from lib.device_name import get_device_name
 from lib.qr_dialog import QRDialog
 
 ADDON = xbmcaddon.Addon()
@@ -38,7 +38,16 @@ class DeviceAuthManager:
     """Drives the full QR-code auth flow."""
 
     def __init__(self):
-        self._client = ChronicleClient()
+        self._client     = ChronicleClient()
+        # Set by _initiate() whenever it returns None, so run() can show the
+        # user what actually went wrong instead of one generic "could not
+        # contact Chronicle" message regardless of cause (empty URL, DNS
+        # failure, connection refused, timeout, wrong port, 404/500 from a
+        # reachable-but-misconfigured server, malformed JSON...). Same fix as
+        # Chronicle_Scraper's device_auth.py — confirmed live complaint there
+        # ("the error is always the same, there is never a why") and this
+        # file is the same generic-except pattern.
+        self._last_error = None
 
     def run(self) -> bool:
         """
@@ -46,11 +55,13 @@ class DeviceAuthManager:
         Returns True if an API key was successfully obtained, False otherwise.
         """
         # ── 1. Initiate ─────────────────────────────────────────────────────
+        self._last_error = None
         result = self._initiate()
         if result is None:
+            reason = self._last_error or ADDON.getLocalizedString(32065)
             xbmcgui.Dialog().ok(
                 ADDON.getLocalizedString(32060),
-                ADDON.getLocalizedString(32065),  # Could not contact Chronicle
+                '{0}\n\n{1}'.format(ADDON.getLocalizedString(32065), reason),
             )
             return False
 
@@ -111,12 +122,15 @@ class DeviceAuthManager:
     # ── private ────────────────────────────────────────────────────────────────
 
     def _initiate(self):
-        """POST /api/v1/auth/device — returns parsed JSON data dict or None."""
+        """POST /api/v1/auth/device — returns parsed JSON data dict, or None on
+        failure. On None, self._last_error carries a specific, user-facing
+        reason — see the docstring on _last_error's declaration above."""
         base_url = ADDON.getSetting('chronicle_url').rstrip('/')
         if not base_url:
+            self._last_error = ADDON.getLocalizedString(32085)  # "Chronicle URL is not set."
             return None
 
-        device_name = self._get_device_name()
+        device_name = get_device_name()
 
         try:
             url     = '{0}/api/v1/auth/device'.format(base_url)
@@ -130,33 +144,26 @@ class DeviceAuthManager:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 body = json.loads(resp.read().decode('utf-8'))
                 return body.get('data')
+        except urllib.error.HTTPError as exc:
+            detail = ''
+            try:
+                detail = exc.read().decode('utf-8', errors='replace').strip()[:200]
+            except Exception:
+                pass
+            log.error('Device auth initiation failed: HTTP {0} {1} — {2}'.format(
+                       exc.code, exc.reason, detail or '(no body)'))
+            self._last_error = 'HTTP {0} {1}{2}'.format(
+                exc.code, exc.reason, ' — {0}'.format(detail) if detail else '')
+            return None
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            reason = getattr(exc, 'reason', None) or exc
+            log.error('Device auth initiation failed: {0} (url={1})'.format(reason, base_url))
+            self._last_error = '{0}\n({1})'.format(reason, base_url)
+            return None
         except Exception as exc:
             log.error('Device auth initiation failed: {0}'.format(exc))
+            self._last_error = str(exc)
             return None
-
-    @staticmethod
-    def _get_device_name() -> str:
-        """Prefer the machine's actual DNS name over Kodi's own FriendlyName setting --
-        FriendlyName is just an arbitrary label the user can set to anything, while a
-        real DNS name is a verifiable identifier for the physical device, which matters
-        more on a screen that's asking "is this really my device connecting?".
-
-        socket.getfqdn() tries a genuine reverse-DNS/hosts lookup and upgrades to a
-        dotted name when that succeeds, but on a typical home LAN there's usually no
-        such record -- it then falls back to the plain OS hostname (e.g. "Vision"),
-        which is still a real, meaningful identifier (often mDNS-resolvable as
-        "Vision.local") and clearly better than an arbitrary Kodi settings label. Only
-        the degenerate "localhost" non-answer is treated as "no usable name".
-        """
-        try:
-            fqdn = socket.getfqdn().strip()
-            if fqdn and fqdn.lower() not in ('localhost', 'localhost.localdomain'):
-                return fqdn
-        except Exception as exc:
-            log.debug('DNS name lookup failed: {0}'.format(exc))
-
-        friendly_name = xbmcgui.Window(10000).getProperty('System.FriendlyName')
-        return 'Kodi — {0}'.format(friendly_name or 'Kodi')
 
     def _download_qr(self, qr_url: str, code: str) -> str:
         """Download QR PNG to a temp file unique to this code, return its special:// VFS

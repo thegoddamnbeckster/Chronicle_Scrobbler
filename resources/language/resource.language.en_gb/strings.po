@@ -245,6 +245,26 @@ msgctxt "#32084"
 msgid "Expires in {0}"
 msgstr ""
 
+msgctxt "#32085"
+msgid "Chronicle URL is not set — enter it above, then try Connect again."
+msgstr ""
+
+msgctxt "#32086"
+msgid "Show scrobble notifications"
+msgstr ""
+
+msgctxt "#32087"
+msgid "Shows a brief on-screen notification when this addon starts scrobbling something and again when it's marked watched. Turn this off if you'd rather scrobbling stay silent."
+msgstr ""
+
+msgctxt "#32088"
+msgid "Now scrobbling: {0}"
+msgstr ""
+
+msgctxt "#32089"
+msgid "Marked as watched: {0}"
+msgstr ""
+
 msgctxt "#32074"
 msgid "Sync (Chronicle -> Kodi)"
 msgstr ""

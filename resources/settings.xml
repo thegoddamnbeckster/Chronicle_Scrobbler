@@ -24,6 +24,7 @@
         <setting id="scrobble_movies" type="bool" label="32009" default="true"/>
         <setting id="scrobble_tv" type="bool" label="32015" default="true"/>
         <setting id="scrobble_music" type="bool" label="32016" default="false"/>
+        <setting id="show_notifications" type="bool" label="32086" default="true" help="32087"/>
     </category>
 
     <!-- ============================================================================ -->
