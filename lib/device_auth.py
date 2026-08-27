@@ -14,7 +14,6 @@ DeviceAuthController):
 """
 
 import threading
-import time
 import json
 import urllib.request
 import urllib.error
@@ -24,7 +23,7 @@ import xbmcgui
 import xbmcaddon
 
 from lib.logger import Logger
-from lib.chronicle_client import ChronicleClient
+from lib.chronicle_client import call_with_timeout, _USER_AGENT
 from lib.device_name import get_device_name
 from lib.qr_dialog import QRDialog
 
@@ -52,7 +51,6 @@ class DeviceAuthManager:
         hands it over directly instead of asking this object to go
         re-discover it independently.
         """
-        self._client     = ChronicleClient()
         self._base_url   = base_url
         # Set by _initiate() whenever it returns None, so run() can show the
         # user what actually went wrong instead of one generic "could not
@@ -102,10 +100,11 @@ class DeviceAuthManager:
 
         # ── 3. Start polling thread ─────────────────────────────────────────
         api_key_holder = [None]   # shared result slot
+        poll_error     = [None]   # set by _poll_loop on a terminal-but-keyless outcome
         stop_event     = threading.Event()
         poll_thread    = threading.Thread(
             target=self._poll_loop,
-            args=(code, api_key_holder, stop_event),
+            args=(code, api_key_holder, stop_event, poll_error),
             daemon=True,
         )
         poll_thread.start()
@@ -140,6 +139,9 @@ class DeviceAuthManager:
             )
             return True
 
+        if poll_error[0]:
+            xbmcgui.Dialog().ok(ADDON.getLocalizedString(32060), poll_error[0])
+
         return False
 
     # ── private ────────────────────────────────────────────────────────────────
@@ -173,12 +175,23 @@ class DeviceAuthManager:
             req     = urllib.request.Request(
                 url, data=payload,
                 headers={'Content-Type': 'application/json',
-                         'User-Agent': 'Kodi/Chronicle-Scrobbler/1.0'},
+                         'User-Agent': _USER_AGENT},
                 method='POST',
             )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                body = json.loads(resp.read().decode('utf-8'))
-                return body.get('data')
+            def _do():
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    body = json.loads(resp.read().decode('utf-8'))
+                    return body.get('data')
+            data = call_with_timeout(_do, 10)
+            if not isinstance(data, dict) or not all(
+                    k in data for k in ('code', 'displayCode', 'qrUrl', 'verificationUrl')):
+                # Reachable-but-misbehaving server: HTTP 200 with a shape run() can't
+                # use. Caught here, not left for run()'s `result['code']` etc. to
+                # raise an uncaught KeyError past the specific error messages below.
+                log.error('Device auth initiation failed: malformed response data: {0!r}'.format(data))
+                self._last_error = ADDON.getLocalizedString(32113)
+                return None
+            return data
         except urllib.error.HTTPError as exc:
             detail = ''
             try:
@@ -216,10 +229,12 @@ class DeviceAuthManager:
         try:
             req = urllib.request.Request(
                 qr_url,
-                headers={'User-Agent': 'Kodi/Chronicle-Scrobbler/1.0'},
+                headers={'User-Agent': _USER_AGENT},
             )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = resp.read()
+            def _do():
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    return resp.read()
+            data = call_with_timeout(_do, 10)
 
             f = xbmcvfs.File(vfs_path, 'w')
             try:
@@ -233,7 +248,7 @@ class DeviceAuthManager:
             log.warning('QR download failed: {0}'.format(exc))
             return ''
 
-    def _poll_loop(self, code: str, api_key_holder: list, stop_event: threading.Event):
+    def _poll_loop(self, code: str, api_key_holder: list, stop_event: threading.Event, poll_error: list):
         """Background thread: poll Chronicle until approved, denied, expired, or cancelled.
 
         Uses self._base_url (see __init__'s own docstring for why) instead of
@@ -258,13 +273,15 @@ class DeviceAuthManager:
             try:
                 req = urllib.request.Request(
                     url,
-                    headers={'User-Agent': 'Kodi/Chronicle-Scrobbler/1.0'},
+                    headers={'User-Agent': _USER_AGENT},
                 )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    body   = json.loads(resp.read().decode('utf-8'))
-                    data   = body.get('data', {})
-                    status = data.get('status', 'pending')
-                    api_key = data.get('apiKey')
+                def _do():
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        return json.loads(resp.read().decode('utf-8'))
+                body    = call_with_timeout(_do, 10)
+                data    = body.get('data', {})
+                status  = data.get('status', 'pending')
+                api_key = data.get('apiKey')
 
                 log.debug('Poll status: {0}'.format(status))
 
@@ -273,6 +290,20 @@ class DeviceAuthManager:
                     stop_event.set()
                     break
                 elif status in ('denied', 'expired'):
+                    stop_event.set()
+                    break
+                elif status == 'approved' and not api_key:
+                    # Chronicle only returns the raw key on the ONE poll that first
+                    # observes "approved" -- every poll after that returns
+                    # approved/null forever (consume-once semantics server-side, see
+                    # DeviceAuthService.PollAsync). If that one response was ever
+                    # lost client-side (e.g. call_with_timeout's watchdog gives up on
+                    # a request that actually completed), every later poll lands
+                    # here with nothing left to retrieve -- treat it as terminal
+                    # instead of polling forever with no way for the user out of it.
+                    log.warning('Poll returned approved with no apiKey -- key was '
+                                'already consumed by an earlier attempt')
+                    poll_error[0] = ADDON.getLocalizedString(32110)
                     stop_event.set()
                     break
 

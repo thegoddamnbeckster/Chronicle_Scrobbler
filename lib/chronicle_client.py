@@ -8,6 +8,7 @@ Authentication: X-Api-Key header (Chronicle scrobbler API key).
 """
 
 import json
+import threading
 import urllib.request
 import urllib.error
 import xbmcaddon
@@ -18,6 +19,39 @@ ADDON = xbmcaddon.Addon()
 log   = Logger('client')
 
 _USER_AGENT = 'Kodi/Chronicle-Scrobbler/1.0'
+
+# urlopen(timeout=N) only bounds the socket once it exists -- the DNS lookup
+# (getaddrinfo) that happens before that is NOT covered by that timeout on
+# any platform. A dead/unreachable DNS server or a stale hostname can hang a
+# "timed" call forever, well past whatever timeout= was passed in. Confirmed
+# live against the sibling Chronicle_Scraper addons (2026-08-27), whose own
+# chronicle_client.py carries this exact same watchdog for this exact same
+# reason -- this addon's device_auth.py never adopted it. call_with_timeout()
+# is the backstop: it runs the call on a daemon thread and gives up after
+# timeout + _WATCHDOG_GRACE_SECONDS even if that thread never returns,
+# leaving the runaway thread to die on its own (daemon=True means it can't
+# block Kodi from exiting).
+_WATCHDOG_GRACE_SECONDS = 5
+
+
+def call_with_timeout(fn, timeout):
+    result = {}
+
+    def _target():
+        try:
+            result['value'] = fn()
+        except BaseException as exc:
+            result['error'] = exc
+
+    t = threading.Thread(target=_target, daemon=True)
+    t.start()
+    t.join(timeout + _WATCHDOG_GRACE_SECONDS)
+    if t.is_alive():
+        raise TimeoutError('no response within {0}s (DNS/network hang)'.format(
+            timeout + _WATCHDOG_GRACE_SECONDS))
+    if 'error' in result:
+        raise result['error']
+    return result.get('value')
 
 
 class ChronicleClient:
