@@ -44,6 +44,7 @@ import xbmcaddon
 
 from lib.logger import Logger
 from lib.chronicle_client import ChronicleClient
+from lib.device_name import get_device_name
 from lib import kodi_matcher
 
 ADDON = xbmcaddon.Addon()
@@ -281,7 +282,7 @@ class SyncEngine:
                     'mediaItemId':     media_item_id,
                     'progressPercent': 100,
                     'timestamp':       _kodi_lastplayed_to_iso(kodi_lastplayed),
-                    'deviceName':      'Kodi (reconciled from local play count)',
+                    'deviceName':      '{0} (reconciled from local play count)'.format(get_device_name()),
                 })
         elif not kodi_is_newer and chronicle_count > kodi_playcount:
             # Chronicle has watch(es) Kodi doesn't know about — push Kodi's

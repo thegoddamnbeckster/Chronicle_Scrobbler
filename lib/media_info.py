@@ -9,6 +9,7 @@ MediaInfo    — snapshot of the currently-playing item, including all
 import json
 import xbmc
 
+from lib.device_name import get_device_name
 from lib.logger import Logger
 
 log = Logger('media_info')
@@ -225,7 +226,7 @@ class MediaInfo:
             'year':            self.year,
             'progressPercent': round(self.percentage, 2),
             'externalIds':     self.external_ids,
-            'deviceName':      'Kodi',
+            'deviceName':      get_device_name(),
         }
 
     def to_resume_lookup_payload(self) -> dict:
