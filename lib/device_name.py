@@ -9,6 +9,7 @@ to send -- indistinguishable from any other Kodi instance scrobbling to the
 same Chronicle account.
 """
 
+import ipaddress
 import socket
 
 import xbmc
@@ -89,8 +90,20 @@ def get_device_name() -> str:
 
     try:
         ip = (xbmc.getInfoLabel('Network.IPAddress') or '').strip()
+        # Confirmed live (2026-08-29): this infolabel doesn't only ever return a real
+        # dotted address or an empty string -- while Kodi's network status is still
+        # being computed it can return the literal placeholder word "Busy", which the
+        # old check here happily accepted (non-empty, not "localhost", not "0.0.0.0")
+        # and sent to Chronicle as a scrobble's deviceName verbatim. Validating it
+        # actually parses as an IP address is what "the IP address of the device"
+        # in the per-user spec actually means -- not "whatever non-empty string this
+        # infolabel happened to return".
         if ip and ip.lower() not in _LOOPBACK_NAMES and ip != '0.0.0.0':
-            return ip
+            try:
+                ipaddress.ip_address(ip)
+                return ip
+            except ValueError:
+                log.debug("Network.IPAddress returned a non-IP placeholder: {0!r}".format(ip))
     except Exception as exc:
         log.debug('IP address lookup failed: {0}'.format(exc))
 

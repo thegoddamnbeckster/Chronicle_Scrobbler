@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.1"
+       version="2.4.2"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,26 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.1 - Per-user correction to v2.4.0's device-name fallback (2026-08-28):
+    <news>v2.4.2 - Two fixes, both confirmed live against a real TV episode scrobble
+(2026-08-29, "Rick and Morty" S03E04):
+(1) CRITICAL: every TV episode scrobble sent year=0 instead of omitting the field --
+Kodi's Player.GetItem never populates 'year' for an 'episode' item (that belongs to
+the show, not the episode), but MediaInfo.year used to default missing data to the
+integer 0 rather than None. Chronicle's own matcher treats an explicit year (even 0)
+as a real filter, not "no year given" -- so an episode scrobble could never title-match
+its own already-correctly-tagged show (e.g. Year=2013) and silently created a brand-new,
+wrongly-Year=0 duplicate top-level stub instead, confirmed live: the real "Rick and
+Morty" show already existed with the right TMDB id, but this scrobble minted a second
+one because year=0 could never match Year=2013 and the episode's own uniqueid (not the
+show's) didn't match anything either. MediaInfo.year now returns None when Kodi has no
+year data, which round-trips as JSON null -- correctly read server-side as "no year
+given, match by title alone."
+(2) lib/device_name.py's IP-address fallback tier could return the literal string
+"Busy" as a device name -- confirmed live that Kodi's Network.IPAddress infolabel
+returns that placeholder while network status is still being computed, and the old
+check (non-empty, not "localhost", not "0.0.0.0") happily accepted it as if it were a
+real address. Now validates the value actually parses as an IP before accepting it.
+v2.4.1 - Per-user correction to v2.4.0's device-name fallback (2026-08-28):
 "Kodi (unnamed device)" told you nothing about WHICH box it was. New order,
 four tiers: (1) socket.getfqdn()/gethostname() -- the device's real network
 identity, unchanged from v2.4.0; (2) System.FriendlyName, but only when it's

@@ -119,8 +119,27 @@ class MediaInfo:
         return self._item.get('title', '')
 
     @property
-    def year(self) -> int:
-        return int(self._item.get('year', 0) or 0)
+    def year(self):
+        """The item's release year, or None when Kodi has none to give.
+
+        Confirmed directly (2026-08-29): Kodi's Player.GetItem never populates
+        'year' for an 'episode' item -- that field belongs to the show/movie, not
+        an individual episode -- so this used to silently return the integer 0
+        for every single TV episode, not "no year known". Chronicle's own
+        matcher (MediaItemMatcher.FindByTitleYearAsync) treats an explicit 0 as
+        a REAL year to filter on (`m.Year == 0`), not as "no filter" the way a
+        JSON null / omitted field is -- so an episode scrobble could never
+        title-match its own already-correctly-tagged show (Year=2013, say) and
+        silently created a brand-new, wrongly-Year=0 duplicate stub instead,
+        confirmed live against "Rick and Morty" (S03E04): the correct show
+        already existed with the right TMDB id, but this scrobble minted a
+        second top-level "Rick and Morty" item because year=0 could never
+        match Year=2013 and the episode's own uniqueid (not the show's) never
+        matched anything either. None here (not 0) round-trips as JSON null,
+        which int? Year on the server correctly reads as "no year given".
+        """
+        raw = self._item.get('year')
+        return int(raw) if raw else None
 
     @property
     def season(self) -> int:
