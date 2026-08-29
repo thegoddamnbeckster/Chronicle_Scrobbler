@@ -14,6 +14,7 @@
         <setting id="chronicle_url" type="text" label="32002" enable="false" default=""/>
         <setting id="authorization" type="action" label="32061" action="RunScript(service.chronicle.scrobbler,action=auth)"/>
         <setting id="change_url" type="action" label="32112" action="RunScript(service.chronicle.scrobbler,action=change_url)"/>
+        <setting id="test_connection" type="action" label="32012" action="RunScript(service.chronicle.scrobbler,action=test_connection)"/>
         <setting id="auth_status" type="text" label="32080" enable="false" default=""/>
         <!-- Set automatically by the QR/PIN flow above — not meant to be typed by hand -->
         <setting id="api_key" type="text" label="32003" visible="false"/>
@@ -34,6 +35,8 @@
         <setting id="scrobble_tv" type="bool" label="32015" default="true"/>
         <setting id="scrobble_music" type="bool" label="32016" default="false"/>
         <setting id="show_notifications" type="bool" label="32086" default="true" help="32087"/>
+        <setting id="reset_tv_progress" type="action" label="32010" action="RunScript(service.chronicle.scrobbler,action=reset_tv)"/>
+        <setting id="reset_movie_progress" type="action" label="32011" action="RunScript(service.chronicle.scrobbler,action=reset_movie)"/>
     </category>
 
     <!-- ============================================================================ -->
@@ -43,6 +46,8 @@
         <setting id="sync_ratings" type="bool" label="32076" default="true"/>
         <setting id="sync_art" type="bool" label="32077" default="true"/>
         <setting id="sync_playcount" type="bool" label="32078" default="true"/>
+        <setting id="sync_watch_history_now" type="action" label="32070" action="RunScript(service.chronicle.scrobbler,action=sync_watch_history)"/>
+        <setting id="sync_lists_now" type="action" label="32050" action="RunScript(service.chronicle.scrobbler,action=sync_lists)"/>
     </category>
 
 </settings>

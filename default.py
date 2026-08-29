@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 """service.chronicle.scrobbler — Script entry point.
 
-Shown when the user opens the addon from the Kodi add-on browser.
-Presents a simple action menu:
-  • Sync Watch History & Ratings Now
-  • Reset TV Show Progress
-  • Reset Movie Progress
-  • Test Connection
-  • Connect to Chronicle  (QR device auth)
-  • Sync Lists to Kodi    (playlist sync)
-  • Open Settings
+Launching the addon from Kodi's Add-on browser goes straight to Settings --
+per-user correction (2026-08-29): "I only ever want them to open the regular
+settings window, not whatever [the old action-list menu] is." The other
+actions this used to offer as a Dialog().select() menu (Sync Watch History &
+Ratings Now, Reset TV/Movie Progress, Test Connection, Sync Lists to Kodi)
+are still reachable -- each now has its own action button inside the
+relevant Settings category, using the same RunScript(...,action=...)
+mechanism Edit Connection/Change Chronicle URL already used.
 """
 
 import sys
@@ -117,19 +116,13 @@ def _warn_if_localhost():
 
 
 def show_menu():
-    """Display the main action menu. No auto-bounce to Settings on first run --
-    "Edit Connection" is directly reachable from here even when unconfigured,
-    since it's the one reliable place the URL ever gets entered. See
-    _connect_to_chronicle()'s own docstring for why the Settings screen no
-    longer does that job.
-
-    The dialog's own heading carries the current connection status (see
-    _refresh_auth_status()) -- per-user request (2026-08-28): show whether
-    (and to whom) this addon is connected BEFORE offering "Edit Connection"
-    or anything else, not buried a click away in Settings. Refreshed every
-    time this menu opens, same as the Settings status field always was, so
-    it can't go stale between a Connect elsewhere and the next time this
-    menu is shown.
+    """Entry point for both a plain addon-browser launch (no action= arg --
+    goes straight to Settings) and every RunScript(...,action=X) call a
+    Settings action button makes (dispatched below, each returning before
+    Settings would otherwise open). "Edit Connection" works even when
+    unconfigured, since it's the one reliable place the URL ever gets
+    entered -- see _connect_to_chronicle()'s own docstring for why the
+    Settings screen no longer does that job itself.
     """
     args = _get_args()
     if args.get('action') == 'auth':
@@ -138,42 +131,24 @@ def show_menu():
     if args.get('action') == 'change_url':
         _change_chronicle_url()
         return
+    if args.get('action') == 'test_connection':
+        _test_connection()
+        return
+    if args.get('action') == 'sync_watch_history':
+        _sync_watch_history()
+        return
+    if args.get('action') == 'reset_tv':
+        ResetManager().prompt_reset_tvshow()
+        return
+    if args.get('action') == 'reset_movie':
+        ResetManager().prompt_reset_movie()
+        return
+    if args.get('action') == 'sync_lists':
+        _sync_lists()
+        return
 
     _refresh_auth_status()
-
-    options = [
-        ADDON.getLocalizedString(32070),  # Sync Watch History & Ratings Now
-        ADDON.getLocalizedString(32010),  # Reset TV Show Progress
-        ADDON.getLocalizedString(32011),  # Reset Movie Progress
-        ADDON.getLocalizedString(32012),  # Test Connection
-        ADDON.getLocalizedString(32061),  # Edit Connection
-        ADDON.getLocalizedString(32112),  # Change Chronicle URL
-        ADDON.getLocalizedString(32050),  # Sync Lists to Kodi
-        ADDON.getLocalizedString(32013),  # Open Settings
-    ]
-
-    heading = '{0} — {1}'.format(
-        ADDON.getLocalizedString(32000), ADDON.getSetting('auth_status'))
-    dialog = xbmcgui.Dialog()
-    choice = dialog.select(heading, options)
-
-    if choice == 0:
-        _sync_watch_history()
-    elif choice == 1:
-        ResetManager().prompt_reset_tvshow()
-    elif choice == 2:
-        ResetManager().prompt_reset_movie()
-    elif choice == 3:
-        _test_connection()
-    elif choice == 4:
-        _connect_to_chronicle()
-    elif choice == 5:
-        _change_chronicle_url()
-    elif choice == 6:
-        _sync_lists()
-    elif choice == 7:
-        _refresh_auth_status()
-        ADDON.openSettings()
+    ADDON.openSettings()
 
 
 def _test_connection():
