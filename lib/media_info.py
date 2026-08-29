@@ -231,15 +231,16 @@ class MediaInfo:
     def to_scrobble_payload(self) -> dict:
         """Build the Chronicle POST /api/v1/scrobble request body.
 
-        Matches Chronicle.API's real ScrobbleRequestDto exactly: mediaItemId,
-        progressPercent, timestamp, deviceName, externalIds, title, year, mediaType.
-        No mediaItemId is included here — Chronicle resolves/creates the item from
-        title/year/externalIds/mediaType (see ScrobbleService.FindOrCreateMediaItemAsync).
-        Season/episode/showTitle are Kodi-side concepts only; Chronicle's scrobble
-        contract has no fields for them, so they are intentionally left out rather
-        than sent as ignored extras.
+        Matches Chronicle.API's real ScrobbleRequestDto: mediaItemId, progressPercent,
+        timestamp, deviceName, externalIds, title, year, mediaType, season, episode,
+        episodeTitle. No mediaItemId is included here — Chronicle resolves/creates the
+        item from title/year/externalIds/mediaType (see
+        ScrobbleService.FindOrCreateMediaItemAsync). title/year always identify the
+        SHOW for an episode; season/episode/episodeTitle are what let Chronicle step
+        one level further down to the actual episode instead of stopping at the show
+        (per-user report 2026-08-28: "you're missing the episode name").
         """
-        return {
+        payload = {
             'mediaType':       self.media_type,
             'title':           self.show_title if self.media_type == 'episode' else self.title,
             'year':            self.year,
@@ -247,17 +248,27 @@ class MediaInfo:
             'externalIds':     self.external_ids,
             'deviceName':      get_device_name(),
         }
+        if self.media_type == 'episode':
+            payload['season']       = self.season
+            payload['episode']      = self.episode
+            payload['episodeTitle'] = self.title
+        return payload
 
     def to_resume_lookup_payload(self) -> dict:
         """Build the Chronicle POST /api/v1/scrobble/resume request body -- the same
-        identifying fields as to_scrobble_payload(), minus progressPercent/deviceName,
-        which don't mean anything for a lookup rather than an event."""
-        return {
+        identifying fields as to_scrobble_payload(), minus progressPercent/deviceName/
+        episodeTitle, which don't mean anything for a lookup rather than an event (a
+        resume check never creates an episode, so it has no fallback name to offer)."""
+        payload = {
             'mediaType':   self.media_type,
             'title':       self.show_title if self.media_type == 'episode' else self.title,
             'year':        self.year,
             'externalIds': self.external_ids,
         }
+        if self.media_type == 'episode':
+            payload['season']  = self.season
+            payload['episode'] = self.episode
+        return payload
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────

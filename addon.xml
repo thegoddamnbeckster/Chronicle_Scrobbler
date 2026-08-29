@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.5"
+       version="2.4.6"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,22 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.5 - CRITICAL: the "device friendly name" tier of device_name.py never
+    <news>v2.4.6 - Per-user report (2026-08-28): "you're missing the episode name" -- a TV
+episode scrobble has always sent the SHOW's own title (Chronicle's scrobble contract had
+no fields for season/episode at all), so the Now Playing banner and history could only ever
+show the show, never which episode -- confirmed live, "Rick and Morty" gave no indication
+whether S01E01 or S03E04 was actually playing. to_scrobble_payload()/to_resume_lookup_payload()
+now also send season/episode (and, for a live scrobble, episodeTitle -- Kodi's own local
+library scan almost always has the real episode name) when the item is a TV episode.
+Requires Chronicle server with the matching season/episode/episodeTitle fields on
+POST /api/v1/scrobble and /api/v1/scrobble/resume (adds MediaItemMatcher.FindEpisodeAsync/
+FindOrCreateEpisodeAsync). Confirmed live end-to-end: a real "Rick and Morty" S03E04 scrobble
+now resolves onto the actual episode item in Chronicle's own hierarchy (ancestors "Rick and
+Morty" -> "Season 3") instead of stopping at the show, and the Now Playing banner shows
+"Vindicators 3: The Return of Worldender" -- including upgrading that episode's own stored
+name from a stale "S03E04" placeholder (left over from an earlier Simkl sync that had no
+per-episode title) now that a real one is available.
+v2.4.5 - CRITICAL: the "device friendly name" tier of device_name.py never
 actually worked -- confirmed live (2026-08-29) against a Shield with its Kodi Device
 Name customized to "Kodi downstairs": the Now Playing banner still said "Now playing
 on Busy" instead. Root cause: that tier read Window(10000).getProperty(
