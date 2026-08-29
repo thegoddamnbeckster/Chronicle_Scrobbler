@@ -239,6 +239,7 @@ class ChroniclePlayer(xbmc.Player):
         """
         try:
             xbmcvfs.mkdirs(_RATING_SIGNAL_DIR)
+            written_at = int(time.time() * 1000)
             payload = {
                 'title':        state.show_title if state.media_type == 'episode' else state.title,
                 'displayTitle': self._display_title(state),
@@ -246,9 +247,17 @@ class ChroniclePlayer(xbmc.Player):
                 'season':       state.season,
                 'episode':      state.episode,
                 'externalIds':  state.external_ids,
+                # Epoch ms this signal was written -- lets Chronicle Rating's service.py
+                # tell a genuinely-just-finished session apart from one that's been
+                # sitting unconsumed since before Kodi was last shut down (e.g. closed
+                # right after playback ended, before the rating service's next poll),
+                # and skip prompting for the latter instead of ambushing the user with
+                # a rating dialog the moment Kodi starts back up. See that file's own
+                # _is_stale() for the age cutoff.
+                'writtenAt':    written_at,
             }
             path = '{0}rating_{1}_{2}.json'.format(
-                _RATING_SIGNAL_DIR, int(time.time() * 1000), threading.get_ident())
+                _RATING_SIGNAL_DIR, written_at, threading.get_ident())
             f = xbmcvfs.File(path, 'w')
             try:
                 f.write(bytearray(json.dumps(payload), 'utf-8'))

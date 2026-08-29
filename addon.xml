@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.3.3"
+       version="2.4.0"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,24 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.3.3 - Code-review fixes to the Connect flow: device-auth network calls (initiate/QR download/poll) now have the same DNS-hang watchdog the sibling Chronicle_Scraper addons already had -- a dead/unreachable DNS server used to be able to hang Connect indefinitely with zero feedback; now it times out with an error instead. A QR pairing that was approved on the phone but whose one-time key never reached this device used to leave the QR window stuck open forever -- it now shows a clear error and asks you to try Connect again. The Settings status field could briefly flash back to "Not connected" immediately after a successful connect -- fixed. Declining the loopback-URL warning now actually cancels the connect instead of proceeding against that URL anyway. New "Change Chronicle URL" action (main menu and Settings) is the first way to correct a wrong URL once one is saved. A malformed response from Chronicle during device-auth now shows a specific error instead of crashing to a generic "Connect failed unexpectedly".
+    <news>v2.4.0 - Two fixes, both per-user request (2026-08-28):
+(1) The main menu now shows connection status (and WHO's connected -- "Connected as
+{name}", via GET /users/me) directly in the menu heading, before you'd ever click
+"Edit Connection". 5s-bounded so an unreachable server doesn't make the menu itself
+feel stuck; falls back to the last-known name (cached in a new hidden
+connected_display_name setting) rather than regressing to a bare "Connected" on a
+transient network blip.
+(2) lib/device_name.py's Now Playing banner device identifier could resolve to the
+literal "Kodi — Kodi" on a box where neither a DNS name nor a customized Kodi
+"Device Name" is available (confirmed live on an Android Shield: both
+socket.getfqdn() and the un-customized System.FriendlyName default to values that
+produced exactly this) -- indistinguishable from the original "just says Kodi"
+problem this function was written to fix. Added socket.gethostname() as an
+intermediate fallback, and stopped prefixing "Kodi — " onto FriendlyName when
+FriendlyName is itself still the unmodified "Kodi" default; the honest fallback is
+now "Kodi (unnamed device)", which actually points at the real fix (Settings ->
+Services -> Control -> Device Name) instead of quietly repeating one word twice.
+v2.3.3 - Code-review fixes to the Connect flow: device-auth network calls (initiate/QR download/poll) now have the same DNS-hang watchdog the sibling Chronicle_Scraper addons already had -- a dead/unreachable DNS server used to be able to hang Connect indefinitely with zero feedback; now it times out with an error instead. A QR pairing that was approved on the phone but whose one-time key never reached this device used to leave the QR window stuck open forever -- it now shows a clear error and asks you to try Connect again. The Settings status field could briefly flash back to "Not connected" immediately after a successful connect -- fixed. Declining the loopback-URL warning now actually cancels the connect instead of proceeding against that URL anyway. New "Change Chronicle URL" action (main menu and Settings) is the first way to correct a wrong URL once one is saved. A malformed response from Chronicle during device-auth now shows a specific error instead of crashing to a generic "Connect failed unexpectedly".
 v2.3.2 - v2.3.1 fixed _initiate()'s own cross-instance chronicle_url read but missed an identical one in _poll_loop() -- confirmed live against the sibling Chronicle_Scraper addons: after approving the device on the phone, the QR window never closed, since _poll_loop()'s own independent ADDON.getSetting('chronicle_url') read came back empty even though _initiate()'s POST (already fixed) had worked moments earlier. _poll_loop() now also uses self._base_url.
 v2.3.1 - Root cause of v2.3.0's URL-entry-still-not-working reports found via logging (same investigation against the sibling Chronicle_Scraper addons): confirmed live that default.py's own ADDON.setSetting('chronicle_url', ...) is not reliably visible to device_auth.py's SEPARATE xbmcaddon.Addon() instance's very next getSetting('chronicle_url') call -- same process, same addon, same settings.xml, one line apart, and still empty. DeviceAuthManager now takes the resolved URL as a constructor parameter instead of re-reading it independently.
 v2.3.0 - BEHAVIOUR CHANGE, per user request (same change applied to the sibling Chronicle_Scraper addons): the Chronicle URL now has exactly ONE entry point instead of two. Settings' own chronicle_url field is now read-only (enable="false") -- it was never reliably editable there to begin with. "Connect to Chronicle" is renamed "Edit Connection" and is now the only place a URL is ever entered: it prompts via a proven-reliable dialog ONLY when there isn't already a saved URL, so an already-connected reconnect skips straight to the QR window with no prompt -- a working URL is never typed twice. Also removed: the auto-bounce to Settings on first run, and all of v2.2.5-2.2.7's Action(Back)/reopen-Settings/settle-wait/fallback-prompt machinery -- none of it is necessary anymore now that Settings' text field is out of the picture entirely.

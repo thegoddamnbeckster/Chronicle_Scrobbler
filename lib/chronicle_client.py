@@ -249,6 +249,24 @@ class ChronicleClient:
             '/api/v1/lists/{0}'.format(list_id), default={}, warn_unconfigured='get_list'
         ) or {}
 
+    def get_current_user(self):
+        """GET /api/v1/users/me -- the identity behind this addon's own API key.
+        Accepts the same X-Api-Key auth as every scrobble endpoint (Chronicle's
+        default authorization policy takes either a JWT or an API key -- see
+        Chronicle.API's Program.cs), so this needs no separate auth path.
+
+        Used only for the connection-status display in default.py's menu
+        heading/Settings status field -- never anything scrobbling depends on.
+        Short 5s timeout (vs. the 10s default elsewhere in this client): this
+        runs every time the addon's menu opens, so a slow/unreachable server
+        must not make the menu itself feel stuck; a plain "Connected"
+        fallback (see default.py's _refresh_auth_status()) covers the miss.
+
+        Returns {'username', 'displayName', ...} dict, or None on any
+        failure (not configured, network error, revoked key)."""
+        return self._get_json('/api/v1/users/me', default=None, timeout=5,
+                               warn_unconfigured='get_current_user()')
+
     def test_connection(self):
         """GET /api/health — verify connectivity and API key.
 

@@ -300,3 +300,7 @@ msgstr ""
 msgctxt "#32113"
 msgid "Chronicle returned an unexpected response. Please try again, or check the server."
 msgstr ""
+
+msgctxt "#32120"
+msgid "Connected as {0}"
+msgstr ""
