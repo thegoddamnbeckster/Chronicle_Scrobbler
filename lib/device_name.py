@@ -11,6 +11,7 @@ same Chronicle account.
 
 import socket
 
+import xbmc
 import xbmcgui
 
 from lib.logger import Logger
@@ -40,12 +41,31 @@ def get_device_name() -> str:
     (Settings -> Services -> Control -> Device Name), the Now Playing banner
     showed the genuinely useless "Kodi — Kodi" on every un-customized install --
     indistinguishable from the original bug this function was written to fix.
-    Two changes: gethostname() (a plain, non-DNS local call) tried as a second
-    rung before FriendlyName, since it can succeed even when getfqdn()'s DNS
-    step fails; and the "Kodi — " prefix is now skipped whenever FriendlyName
-    is itself still the unmodified default, since prefixing "Kodi — " onto
-    "Kodi" is exactly how the redundant name happened -- an honest, visibly-a-
-    fallback label is more useful than repeating the one word twice.
+    Per-user spec (2026-08-28): "try to use the device friendly name, like
+    Downstairs Shield. failing that's try Kodi's friendly name. if it's Kodi,
+    use the IP address of the device." Four tiers, in order:
+      1. socket.getfqdn() / socket.gethostname() -- the device's own network-
+         level identity (what "device friendly name" means here: NOT Kodi's
+         own setting, the actual machine).
+      2. System.FriendlyName -- Kodi's own configurable label, but ONLY when
+         it's a real customization, not the literal unmodified default "Kodi".
+      3. Network.IPAddress -- always available on any device with a live
+         network connection, and at minimum distinguishes multiple
+         un-customized Kodi instances from each other on the Now Playing
+         banner (e.g. "10.0.0.161" vs "10.0.0.162"), unlike a generic
+         "Kodi (unnamed device)" placeholder every un-named install would
+         send identically.
+      4. Bare "Kodi" -- only if literally nothing above produced anything
+         (no network interface up at all); should be unreachable in practice.
+
+    Confirmed live (2026-08-28, Shield Android TV box): BOTH socket calls come
+    back unusable there -- Android's sandboxed network stack doesn't expose a
+    real hostname/FQDN to Python the way desktop OSes do -- so this used to
+    fall straight through to 'Kodi — {FriendlyName}', and since FriendlyName
+    itself defaults to the literal string "Kodi" until a user explicitly
+    customizes it (Settings -> Services -> Control -> Device Name), the Now
+    Playing banner showed the genuinely useless "Kodi — Kodi" on every
+    un-customized install.
     """
     try:
         fqdn = socket.getfqdn().strip()
@@ -67,9 +87,14 @@ def get_device_name() -> str:
         # needed; the web UI already shows this is a Kodi session separately.
         return friendly_name
 
-    # Every real identifier this function knows how to find either failed or
-    # came back as Kodi's own un-customized default. Naming this explicitly
-    # as unnamed (rather than quietly repeating "Kodi") is what actually
-    # points the user at the fix: Settings -> Services -> Control -> Device
-    # Name, on THIS box specifically.
-    return 'Kodi (unnamed device)'
+    try:
+        ip = (xbmc.getInfoLabel('Network.IPAddress') or '').strip()
+        if ip and ip.lower() not in _LOOPBACK_NAMES and ip != '0.0.0.0':
+            return ip
+    except Exception as exc:
+        log.debug('IP address lookup failed: {0}'.format(exc))
+
+    # Nothing above produced anything at all -- no network interface up,
+    # presumably. Should be unreachable in practice (every device this addon
+    # runs on needs a working network connection to reach Chronicle at all).
+    return 'Kodi'
