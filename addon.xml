@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.2"
+       version="2.4.3"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,15 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.2 - Two fixes, both confirmed live against a real TV episode scrobble
+    <news>v2.4.3 - Per-user request (2026-08-29): "each of the add-ons could check
+each other for the chronicle URL and just copy it in from another working
+add-on... save the typing." "Edit Connection"'s URL prompt now checks the other
+installed Chronicle addons (Scraper Movies, Scraper TV) for an already-configured
+chronicle_url and pre-fills the entry dialog with the first one found, instead
+of always starting blank -- still one explicit confirm step, never silently
+auto-connects. A sibling that isn't installed, or has nothing set yet itself,
+is simply skipped.
+v2.4.2 - Two fixes, both confirmed live against a real TV episode scrobble
 (2026-08-29, "Rick and Morty" S03E04):
 (1) CRITICAL: every TV episode scrobble sent year=0 instead of omitting the field --
 Kodi's Player.GetItem never populates 'year' for an 'episode' item (that belongs to
