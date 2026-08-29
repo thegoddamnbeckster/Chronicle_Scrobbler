@@ -13,7 +13,6 @@ import ipaddress
 import socket
 
 import xbmc
-import xbmcgui
 
 from lib.logger import Logger
 
@@ -82,11 +81,23 @@ def get_device_name() -> str:
     except Exception as exc:
         log.debug('Local hostname lookup failed: {0}'.format(exc))
 
-    friendly_name = (xbmcgui.Window(10000).getProperty('System.FriendlyName') or '').strip()
-    if friendly_name and friendly_name.lower() != 'kodi':
-        # A real, user-customized label -- trust it as-is, no "Kodi — " prefix
-        # needed; the web UI already shows this is a Kodi session separately.
-        return friendly_name
+    try:
+        # Confirmed live (2026-08-29): this used to read Window(10000).getProperty(...),
+        # which only ever returns a value some script explicitly wrote with
+        # setProperty() -- nothing does that for "System.FriendlyName", so this tier
+        # silently returned empty on EVERY call, no matter what the user had actually
+        # set as their Kodi Device Name (confirmed against a Shield with its Device
+        # Name customized to "Kodi downstairs" -- this tier never once returned it,
+        # falling through to the IP tier below every time instead). getInfoLabel() is
+        # the correct way to read a built-in Kodi infolabel -- the same method the IP
+        # tier right below already (correctly) uses.
+        friendly_name = (xbmc.getInfoLabel('System.FriendlyName') or '').strip()
+        if friendly_name and friendly_name.lower() != 'kodi':
+            # A real, user-customized label -- trust it as-is, no "Kodi — " prefix
+            # needed; the web UI already shows this is a Kodi session separately.
+            return friendly_name
+    except Exception as exc:
+        log.debug('System.FriendlyName lookup failed: {0}'.format(exc))
 
     try:
         ip = (xbmc.getInfoLabel('Network.IPAddress') or '').strip()
