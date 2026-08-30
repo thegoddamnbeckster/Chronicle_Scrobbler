@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.9"
+       version="2.4.10"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,18 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.9 - Per-user request (2026-08-30): "get the rating and progress from trakt
+    <news>v2.4.10 - Per-user follow-up (2026-08-30): "if Chronicle's last watched status
+is older than Kodi's status, Kodi should win. Kodi's data should be added into Chronicle.
+if Chronicle's data is more current than Kodi's, Chronicle's data should sync into Kodi."
+v2.4.9 only ever pushed Chronicle -> Kodi (safely never clobbering a local-only Kodi
+position, but also never learning about it either). The silent sync now compares Kodi's own
+lastplayed timestamp against Chronicle's ResumeUpdatedAt for every movie/episode and picks
+one direction: Kodi ahead -> imports its position into Chronicle via the same scrobble
+endpoint live playback already uses (server-side already has its own correct "only if newer"
+guard and >=80% watched/clear-resume handling, reused as-is); Chronicle ahead -> pushes as
+before. Whichever side has NO data at all always loses outright to whichever side has any,
+before timestamps are even compared.
+v2.4.9 - Per-user request (2026-08-30): "get the rating and progress from trakt
 and Simkl and make it sync into Kodi. the most recent status wins." The v2.4.8 silent
 background sync (still every 30 minutes, still SyncEngine.sync_ratings_silent()) now also
 pushes resume position for movies and episodes, alongside ratings -- as a real Kodi

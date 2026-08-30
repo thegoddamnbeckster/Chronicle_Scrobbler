@@ -338,8 +338,12 @@ class SyncEngine:
     def _push_rating_and_progress_silent(
             self, entry: dict, media: dict, sync_ratings: bool, sync_progress: bool) -> bool:
         user_rating = entry.get('userRating') if sync_ratings else None
-        resume_pct  = entry.get('resumePositionPercent') if sync_progress else None
-        if user_rating is None and resume_pct is None:
+        # Deliberately NOT skipping here just because Chronicle itself has neither a rating
+        # nor a resume position -- progress is bidirectional now (per-user request,
+        # 2026-08-30), so Kodi having a local-only position Chronicle doesn't know about yet
+        # is exactly the case this whole method needs to still look the item up for, not
+        # short-circuit past. sync_progress off entirely is the only reason to skip that side.
+        if user_rating is None and not sync_progress:
             return False
 
         media_type = (media.get('mediaTypeInternalName') or '').lower()
@@ -364,12 +368,9 @@ class SyncEngine:
             kodi_item = kodi_matcher.find_movie(ext_ids, media.get('name'), media.get('year'))
             if not kodi_item:
                 return False
-            params = {'movieid': kodi_item['movieid']}
-            _add_rating_and_resume(params, user_rating, resume_pct, media.get('runtimeMinutes'))
-            if len(params) == 1:
-                return False
-            kodi_matcher.KodiJsonRpc.call('VideoLibrary.SetMovieDetails', params)
-            return True
+            return self._reconcile_movie_or_episode(
+                entry, media, kodi_item, sync_progress, user_rating,
+                id_key='movieid', set_method='VideoLibrary.SetMovieDetails')
 
         if level == 2 and media_type in _TV_TYPES:
             ancestors = media.get('ancestors') or []
@@ -387,16 +388,61 @@ class SyncEngine:
                 kodi_show['tvshowid'], season_number, episode_number)
             if not kodi_episode:
                 return False
-            params = {'episodeid': kodi_episode['episodeid']}
-            _add_rating_and_resume(params, user_rating, resume_pct, media.get('runtimeMinutes'))
-            if len(params) == 1:
-                return False
-            kodi_matcher.KodiJsonRpc.call('VideoLibrary.SetEpisodeDetails', params)
-            return True
+            return self._reconcile_movie_or_episode(
+                entry, media, kodi_episode, sync_progress, user_rating,
+                id_key='episodeid', set_method='VideoLibrary.SetEpisodeDetails')
 
         # Season-level entries, movie collections, and unsupported types have
         # no direct Kodi rating/resume field to push to -- skip, not a failure.
         return False
+
+    def _reconcile_movie_or_episode(
+            self, entry: dict, media: dict, kodi_item: dict, sync_progress: bool,
+            user_rating, id_key: str, set_method: str) -> bool:
+        """Rating (if any) always pushes Chronicle -> Kodi -- there's no meaningful
+        "Kodi's own rating" to compare against, Chronicle is the only side with a concept
+        of a synced rating at all. Progress is genuinely bidirectional (per-user request,
+        2026-08-30): whichever side was touched more recently wins, and its value
+        propagates to the other -- see _resolve_progress_direction's own doc.
+        """
+        acted = False
+        params = {id_key: kodi_item[id_key]}
+
+        if sync_progress:
+            direction, pct = _resolve_progress_direction(entry, kodi_item)
+            if direction == 'pull':
+                if self._pull_progress_to_chronicle(media.get('id'), pct, kodi_item.get('lastplayed')):
+                    acted = True
+            elif direction == 'push':
+                _add_resume(params, pct, media.get('runtimeMinutes'))
+
+        if user_rating is not None:
+            params['userrating'] = user_rating
+
+        # A pull already fully handled progress on its own (a separate call, to Chronicle
+        # rather than Kodi) -- only push to Kodi here if there's a rating and/or a resume
+        # value queued up (len > 1: the id key alone never counts).
+        if len(params) > 1:
+            kodi_matcher.KodiJsonRpc.call(set_method, params)
+            acted = True
+
+        return acted
+
+    def _pull_progress_to_chronicle(self, media_item_id, kodi_pct: float, kodi_lastplayed) -> bool:
+        """Imports Kodi's own (more recent) progress into Chronicle via the same scrobble
+        endpoint live playback already uses -- ScrobbleService.ScrobbleAsync already applies
+        its own "only if at least as recent" guard against ResumeUpdatedAt server-side, and
+        already correctly handles the >=80% "mark watched, clear resume" transition, so this
+        doesn't need to duplicate either check here.
+        """
+        if not media_item_id:
+            return False
+        return self._client.scrobble({
+            'mediaItemId':      media_item_id,
+            'progressPercent':  kodi_pct,
+            'timestamp':        _kodi_lastplayed_to_iso(kodi_lastplayed),
+            'deviceName':       '{0} (reconciled from local Kodi playback)'.format(get_device_name()),
+        })
 
     def _build_art_dict(self, media: dict, art_map: dict = None) -> dict:
         resolved = media.get('resolvedMetadata') or {}
@@ -421,23 +467,14 @@ def _external_ids(media: dict) -> dict:
 _RESUME_SKIP_THRESHOLD_PERCENT = 98
 
 
-def _add_rating_and_resume(params: dict, user_rating, resume_pct, runtime_minutes) -> None:
-    """Adds 'userrating' and/or 'resume' to params in place, for whichever of the two are
-    actually available -- shared by the movie and episode branches of
-    _push_rating_and_progress_silent (SetTVShowDetails doesn't take this since Kodi has no
-    single per-show resume position).
-
-    Deliberately never pushes resume={'position': 0, ...} to CLEAR an existing local Kodi
-    resume point when Chronicle simply has no position on file -- Chronicle not knowing about
-    a position (never scrobbled from this device, no Trakt/Simkl playback data either) is not
-    the same as Chronicle knowing the item was watched to completion, and erasing a resume
-    point Kodi's own local playback set independently would be destructive on a mere absence
-    of data. Only ever pushes a real, positive position.
+def _add_resume(params: dict, resume_pct, runtime_minutes) -> None:
+    """Adds 'resume' to params in place when Chronicle's side won the direction comparison
+    (_resolve_progress_direction returned 'push') -- called only in that case, so unlike
+    before this never needs its own "is there even a value" guard against Chronicle simply
+    having nothing on file; that ambiguity is now resolved once, up front, by
+    _resolve_progress_direction itself.
     """
-    if user_rating is not None:
-        params['userrating'] = user_rating
-
-    if resume_pct is None or runtime_minutes is None or runtime_minutes <= 0:
+    if runtime_minutes is None or runtime_minutes <= 0:
         return
     if resume_pct <= 0 or resume_pct >= _RESUME_SKIP_THRESHOLD_PERCENT:
         return
@@ -447,6 +484,49 @@ def _add_rating_and_resume(params: dict, user_rating, resume_pct, runtime_minute
         'position': int(total_seconds * resume_pct / 100),
         'total':    total_seconds,
     }
+
+
+def _resolve_progress_direction(entry: dict, kodi_item: dict):
+    """Per-user request (2026-08-30): "if Chronicle's last watched status is older than
+    Kodi's status, Kodi should win. Kodi's data should be added into Chronicle. If
+    Chronicle's data is more current than Kodi's, Chronicle's data should sync into Kodi."
+
+    Returns ('push', chronicle_pct) to send Chronicle's value to Kodi, ('pull', kodi_pct) to
+    import Kodi's value into Chronicle instead, or (None, None) when neither side has
+    anything meaningful to reconcile. When only one side has data at all, that side always
+    wins outright -- the timestamp comparison only matters once both sides have something to
+    disagree about.
+    """
+    chronicle_pct = entry.get('resumePositionPercent')
+    chronicle_ts  = entry.get('resumeUpdatedAt')
+
+    kodi_lastplayed = kodi_item.get('lastplayed')
+    kodi_playcount  = kodi_item.get('playcount') or 0
+    resume          = kodi_item.get('resume') or {}
+    kodi_position   = resume.get('position') or 0
+    kodi_total      = resume.get('total') or 0
+
+    if kodi_playcount > 0:
+        kodi_pct = 100.0
+    elif kodi_position > 0 and kodi_total > 0:
+        kodi_pct = (kodi_position / kodi_total) * 100.0
+    else:
+        kodi_pct = None
+    # A percent with no timestamp at all (Kodi has literally never played this) isn't a
+    # real signal to reconcile -- lastplayed is Kodi's empty-string/epoch default here.
+    has_kodi = kodi_pct is not None and bool(kodi_lastplayed)
+    has_chronicle = chronicle_pct is not None
+
+    if not has_kodi and not has_chronicle:
+        return None, None
+    if has_kodi and not has_chronicle:
+        return 'pull', kodi_pct
+    if has_chronicle and not has_kodi:
+        return 'push', chronicle_pct
+
+    if _kodi_lastplayed_is_newer(kodi_lastplayed, chronicle_ts):
+        return 'pull', kodi_pct
+    return 'push', chronicle_pct
 
 
 def _kodi_lastplayed_is_newer(kodi_lastplayed, chronicle_last_iso) -> bool:
