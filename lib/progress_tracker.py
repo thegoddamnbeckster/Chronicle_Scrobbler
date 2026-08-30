@@ -37,6 +37,11 @@ class PlaybackState:
     episode:         int   = 0
     show_title:      str   = ''
     external_ids:    dict  = field(default_factory=dict)
+    # Kodi's own local library id for this item (-1 if not in the library) --
+    # carried through to the rating signal file so Chronicle Rating can push a
+    # completed rating straight back into THIS device's own Kodi library, not
+    # just Chronicle. See MediaInfo.db_id's own doc.
+    db_id:           int   = -1
     total_time:      float = 0.0
     last_percentage: float = 0.0
     watched_sent:    bool  = False
@@ -71,6 +76,7 @@ class ProgressTracker:
             show_title=media_info.show_title,
             external_ids=media_info.external_ids,
             total_time=media_info.total_time,
+            db_id=media_info.db_id,
         )
         self._last_scrobble = 0.0   # force a scrobble on the first update
         log.info('Session started: "{0}" ({1})'.format(media_info.title, media_info.media_type))

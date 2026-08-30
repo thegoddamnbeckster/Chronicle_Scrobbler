@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.7"
+       version="2.4.8"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,17 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.7 - Per-user correction (2026-08-29): "I only ever want them to open the
+    <news>v2.4.8 - Per-user request (2026-08-30): rating sync, two parts. (1) The
+"Now playing" signal file this addon writes for Chronicle Rating's automatic prompt now
+carries Kodi's own local library id (dbId) for the item, so a rating submitted there can
+push straight back into this device's own "My Rating" field, not just Chronicle -- see
+Chronicle Rating's own changelog. (2) New background thread, separate from the playback
+poll loop: every 30 minutes, silently re-pushes Chronicle's ratings into this device's
+Kodi library (SyncEngine.sync_ratings_silent(), ratings only, no dialog/notifications) --
+so a rating made anywhere else (a different Kodi, the web UI, an import) reaches this
+device without waiting for someone to run the manual "Sync Watch History &amp; Ratings
+Now" action. Respects the existing sync_ratings setting; a no-op when that's off.
+v2.4.7 - Per-user correction (2026-08-29): "I only ever want them to open the
 regular settings window, not whatever [the old action-list menu] is" -- launching this
 addon from Kodi's Add-on browser now goes straight to Settings instead of showing a
 Dialog().select() menu first. The other actions that menu used to offer (Sync Watch

@@ -292,6 +292,93 @@ class SyncEngine:
                 params['lastplayed'] = _iso_to_kodi_lastplayed(chronicle_last)
             kodi_matcher.KodiJsonRpc.call(set_method, params)
 
+    # ── silent ratings-only sync (background, periodic) ──────────────────────
+
+    def sync_ratings_silent(self) -> SyncResult:
+        """Per-user request (2026-08-30): "any ratings that are saved in
+        chronicle need to be synchronized back into whatever Kodi is running a
+        chronicle sync/scrape." sync_all() above is the deliberate, on-demand,
+        foreground action (progress dialog, notifications) for a full rating+
+        art+playcount pass; this is its silent counterpart -- ratings only, no
+        UI at all -- meant to be called periodically from the background
+        service (see monitor.py) so a rating made anywhere (this device, a
+        different Kodi, the web UI, an import) reaches every device running
+        this addon within one sync interval, not only when someone remembers
+        to run the manual action. Respects the same sync_ratings setting
+        sync_all()'s own rating push does; a no-op entirely when that's off.
+        """
+        result = SyncResult()
+        if not ADDON.getSettingBool('sync_ratings'):
+            return result
+
+        for entry in self._client.iter_library_all_statuses():
+            media = entry.get('mediaItem') or {}
+            try:
+                if self._push_rating_silent(entry, media):
+                    result.synced += 1
+                else:
+                    result.skipped += 1
+            except Exception as exc:
+                log.error('Silent rating sync failed for "{0}": {1}'.format(
+                    media.get('name', '?'), exc))
+                result.failed += 1
+
+        log.info('Silent rating sync complete: {0} synced, {1} skipped, {2} failed'.format(
+            result.synced, result.skipped, result.failed))
+        return result
+
+    def _push_rating_silent(self, entry: dict, media: dict) -> bool:
+        user_rating = entry.get('userRating')
+        if user_rating is None:
+            return False
+
+        media_type = (media.get('mediaTypeInternalName') or '').lower()
+        level      = media.get('hierarchyLevel', 0)
+        ext_ids    = _external_ids(media)
+
+        if level == 0 and media_type in _MOVIE_TYPES:
+            kodi_item = kodi_matcher.find_movie(ext_ids, media.get('name'), media.get('year'))
+            if not kodi_item:
+                return False
+            kodi_matcher.KodiJsonRpc.call(
+                'VideoLibrary.SetMovieDetails',
+                {'movieid': kodi_item['movieid'], 'userrating': user_rating})
+            return True
+
+        if level == 0 and media_type in _TV_TYPES:
+            kodi_item = kodi_matcher.find_tvshow(ext_ids, media.get('name'))
+            if not kodi_item:
+                return False
+            kodi_matcher.KodiJsonRpc.call(
+                'VideoLibrary.SetTVShowDetails',
+                {'tvshowid': kodi_item['tvshowid'], 'userrating': user_rating})
+            return True
+
+        if level == 2 and media_type in _TV_TYPES:
+            ancestors = media.get('ancestors') or []
+            if len(ancestors) < 2:
+                return False
+            kodi_show = kodi_matcher.find_tvshow({}, ancestors[0].get('name'))
+            if not kodi_show:
+                return False
+            season_media = self._client.get_media(ancestors[1].get('id'))
+            season_number  = season_media.get('number')
+            episode_number = media.get('number')
+            if season_number is None or episode_number is None:
+                return False
+            kodi_episode = kodi_matcher.find_episode(
+                kodi_show['tvshowid'], season_number, episode_number)
+            if not kodi_episode:
+                return False
+            kodi_matcher.KodiJsonRpc.call(
+                'VideoLibrary.SetEpisodeDetails',
+                {'episodeid': kodi_episode['episodeid'], 'userrating': user_rating})
+            return True
+
+        # Season-level entries, movie collections, and unsupported types have
+        # no direct Kodi rating field to push to -- skip, not a failure.
+        return False
+
     def _build_art_dict(self, media: dict, art_map: dict = None) -> dict:
         resolved = media.get('resolvedMetadata') or {}
         field_map = art_map or _ART_FIELD_MAP

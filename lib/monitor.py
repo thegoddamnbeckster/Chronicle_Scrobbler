@@ -55,6 +55,7 @@ from lib.logger import Logger
 from lib.chronicle_client import ChronicleClient
 from lib.media_info import MediaInfo
 from lib.progress_tracker import ProgressTracker
+from lib.sync_engine import SyncEngine
 
 ADDON = xbmcaddon.Addon()
 log   = Logger('monitor')
@@ -68,6 +69,19 @@ _POLL_SLEEP = 5
 # multiple scans fire in quick succession (confirmed happens in practice: two scans
 # 50s apart from a single content-settings toggle).
 _CLEAN_THROTTLE_SECONDS = 120
+
+# How often the background service silently re-pushes ratings to this device's
+# Kodi library (SyncEngine.sync_ratings_silent()) -- per-user request
+# (2026-08-30): "any ratings that are saved in chronicle need to be
+# synchronized back into whatever Kodi is running a chronicle sync/scrape."
+# A rating made on THIS device already pushes immediately (see
+# Chronicle_Rating's rate_flow.py); this periodic pass is what brings a
+# rating made anywhere ELSE (a different Kodi, the web UI, an import) to
+# this device too, without requiring the manual "Sync Watch History &
+# Ratings Now" action. 30 minutes -- frequent enough that a rating shows up
+# the same viewing session on another device, not so frequent it's hammering
+# Chronicle with a full library fetch every few minutes.
+_RATING_SYNC_INTERVAL_SECONDS = 1800
 
 # Cross-addon signal directory: this addon (Chronicle_Scrobbler) writes one file here
 # per watched session, and the separate script.chronicle.rating addon's own background
@@ -247,6 +261,11 @@ class ChroniclePlayer(xbmc.Player):
                 'season':       state.season,
                 'episode':      state.episode,
                 'externalIds':  state.external_ids,
+                # Kodi's own local library id for this item -- per-user request
+                # (2026-08-30): "when a rating is completed... the media item needs
+                # to be saved to the Kodi my rating". -1 (not in the library) means
+                # Chronicle Rating has nothing to push a rating back into locally.
+                'dbId':         state.db_id,
                 # Epoch ms this signal was written -- lets Chronicle Rating's service.py
                 # tell a genuinely-just-finished session apart from one that's been
                 # sitting unconsumed since before Kodi was last shut down (e.g. closed
@@ -342,6 +361,7 @@ class ChronicleMonitor(xbmc.Monitor):
         self._lock         = threading.Lock()
         self._player       = ChroniclePlayer(self._client, self._tracker, self._lock)
         self._poll_thread  = None
+        self._rating_sync_thread = None
         self._stop_event   = threading.Event()
 
     # ── xbmc.Monitor callbacks ─────────────────────────────────────────────────
@@ -383,6 +403,7 @@ class ChronicleMonitor(xbmc.Monitor):
         """Block until Kodi requests an abort. Called from service.py."""
         log.info('Poll thread starting')
         self._start_poll_thread()
+        self._start_rating_sync_thread()
 
         while not self.abortRequested():
             self.waitForAbort(10)
@@ -391,8 +412,40 @@ class ChronicleMonitor(xbmc.Monitor):
         self._stop_event.set()
         if self._poll_thread and self._poll_thread.is_alive():
             self._poll_thread.join(timeout=20)
+        if self._rating_sync_thread and self._rating_sync_thread.is_alive():
+            self._rating_sync_thread.join(timeout=5)
 
     # ── private helpers ────────────────────────────────────────────────────────
+
+    def _start_rating_sync_thread(self) -> None:
+        """Own thread, own (longer) interval, not the tight playback poll loop --
+        SyncEngine.sync_ratings_silent() fetches the user's whole Chronicle
+        library and can take a real amount of time for a large one; running it
+        on the playback poll thread would delay scrobbling, and running it on
+        the outer abort-check loop (waitForAbort(10) in run() above) would
+        delay Kodi shutdown responsiveness for however long a sync in progress
+        takes. Waits out a full interval before its FIRST run too -- nothing
+        this addon does needs a rating sync within seconds of Kodi starting,
+        and every other startup-timing lesson in this codebase (see the
+        rating add-on's own _flush_stale_startup_signals) points the same way:
+        don't front-load background work into the moment Kodi just opened.
+        """
+        thread = threading.Thread(
+            target=self._rating_sync_loop,
+            name='ChronicleScrobbler-RatingSync',
+            daemon=True,
+        )
+        thread.start()
+        self._rating_sync_thread = thread
+
+    def _rating_sync_loop(self) -> None:
+        log.debug('Rating sync loop started')
+        while not self._stop_event.wait(_RATING_SYNC_INTERVAL_SECONDS):
+            try:
+                SyncEngine().sync_ratings_silent()
+            except Exception as exc:
+                log.error('Silent rating sync error: {0}'.format(exc))
+        log.debug('Rating sync loop stopped')
 
     def _start_poll_thread(self) -> None:
         self._stop_event.clear()
