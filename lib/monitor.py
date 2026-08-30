@@ -70,17 +70,19 @@ _POLL_SLEEP = 5
 # 50s apart from a single content-settings toggle).
 _CLEAN_THROTTLE_SECONDS = 120
 
-# How often the background service silently re-pushes ratings to this device's
-# Kodi library (SyncEngine.sync_ratings_silent()) -- per-user request
-# (2026-08-30): "any ratings that are saved in chronicle need to be
-# synchronized back into whatever Kodi is running a chronicle sync/scrape."
-# A rating made on THIS device already pushes immediately (see
-# Chronicle_Rating's rate_flow.py); this periodic pass is what brings a
-# rating made anywhere ELSE (a different Kodi, the web UI, an import) to
-# this device too, without requiring the manual "Sync Watch History &
-# Ratings Now" action. 30 minutes -- frequent enough that a rating shows up
-# the same viewing session on another device, not so frequent it's hammering
-# Chronicle with a full library fetch every few minutes.
+# How often the background service silently re-pushes ratings AND resume position to this
+# device's Kodi library (SyncEngine.sync_ratings_silent(), which despite its name now also
+# covers progress -- name kept stable since monitor.py and settings.xml both reference it)
+# -- per-user request (2026-08-30): "any ratings that are saved in chronicle need to be
+# synchronized back into whatever Kodi is running a chronicle sync/scrape", extended
+# (2026-08-30) to "get the rating and progress from trakt and Simkl and make it sync into
+# Kodi. the most recent status wins." A rating made on THIS device already pushes
+# immediately (see Chronicle_Rating's rate_flow.py); this periodic pass is what brings a
+# rating or in-progress position made anywhere ELSE (a different Kodi, the web UI, a Trakt/
+# Simkl sync) to this device too, without requiring the manual "Sync Watch History & Ratings
+# Now" action. 30 minutes -- frequent enough that either shows up the same viewing session on
+# another device, not so frequent it's hammering Chronicle with a full library fetch every
+# few minutes.
 _RATING_SYNC_INTERVAL_SECONDS = 1800
 
 # Cross-addon signal directory: this addon (Chronicle_Scrobbler) writes one file here

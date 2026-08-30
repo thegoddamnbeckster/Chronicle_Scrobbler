@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.8"
+       version="2.4.9"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,21 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.8 - Per-user request (2026-08-30): rating sync, two parts. (1) The
+    <news>v2.4.9 - Per-user request (2026-08-30): "get the rating and progress from trakt
+and Simkl and make it sync into Kodi. the most recent status wins." The v2.4.8 silent
+background sync (still every 30 minutes, still SyncEngine.sync_ratings_silent()) now also
+pushes resume position for movies and episodes, alongside ratings -- as a real Kodi
+resume position/total value, computed from the item's own runtime, whenever
+Chronicle has one on file (never clears an existing local Kodi resume point just because
+Chronicle doesn't have a position -- that's absence of data, not evidence it was finished).
+"Most recent wins" is resolved server-side (Chronicle only ever reports its own
+already-merged current value); the two settings (sync_ratings / new sync_progress, both
+default on) gate independently, so either can be turned off without disabling the other.
+Also fixed server-side: Trakt and Simkl's own syncs now actually import playback progress
+and use real per-rating timestamps for that same "most recent wins" comparison, and
+GET /api/v1/library (what this whole sync reads) now correctly reports each item's type --
+see the main Chronicle changelog for the full server-side half of this fix.
+v2.4.8 - Per-user request (2026-08-30): rating sync, two parts. (1) The
 "Now playing" signal file this addon writes for Chronicle Rating's automatic prompt now
 carries Kodi's own local library id (dbId) for the item, so a rating submitted there can
 push straight back into this device's own "My Rating" field, not just Chronicle -- see
