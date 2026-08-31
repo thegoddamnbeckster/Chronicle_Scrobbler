@@ -20,14 +20,9 @@ log = Logger('kodi_matcher')
 # 'file' is included for every entity so playlist_sync.py can build .m3u paths
 # from the same lookups sync_engine.py uses for rating/playcount/art reconciliation
 # — one matching implementation, every caller gets what it needs from one call.
-# 'resume' (movies/episodes only -- Kodi has no per-show resume concept) is what
-# sync_engine.py's bidirectional progress reconciliation compares against Chronicle's
-# own ResumePositionPercent (per-user request 2026-08-30: "if Chronicle's last watched
-# status is older than Kodi's... Kodi should win... if Chronicle's data is more
-# current... Chronicle's data should sync into Kodi").
-_MOVIE_PROPS   = ['title', 'year', 'imdbnumber', 'uniqueid', 'userrating', 'playcount', 'lastplayed', 'resume', 'art', 'file']
+_MOVIE_PROPS   = ['title', 'year', 'imdbnumber', 'uniqueid', 'userrating', 'playcount', 'lastplayed', 'art', 'file']
 _SHOW_PROPS    = ['title', 'year', 'imdbnumber', 'uniqueid', 'userrating']
-_EPISODE_PROPS = ['title', 'season', 'episode', 'tvshowid', 'userrating', 'playcount', 'lastplayed', 'resume', 'art', 'file']
+_EPISODE_PROPS = ['title', 'season', 'episode', 'tvshowid', 'userrating', 'playcount', 'lastplayed', 'art', 'file']
 
 
 def find_movie(external_ids: dict, title: str, year=None) -> dict:

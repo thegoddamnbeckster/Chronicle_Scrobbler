@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.10"
+       version="2.4.12"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,36 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.10 - Per-user follow-up (2026-08-30): "if Chronicle's last watched status
+    <news>v2.4.12 - Bug fix (2026-08-30): "movies inside collections never got their
+rating" -- confirmed and fixed, then corrected per-user follow-up ("why are you gating
+the hierarchy level? shouldn't everything that can be rated be allowed?"). _sync_entry()'s
+dispatch only routed a movie to _sync_movie_or_collection() (rating/art/playcount push)
+when its hierarchyLevel was 0. That's irrelevant to whether a movie is ratable -- a movie
+belonging to a collection is simply reparented under its collection container
+(hierarchyLevel=1, per Chronicle's own MovieCollectionService.ReparentExistingMemberIfNeededAsync)
+and is exactly as real and ratable as a standalone one. Fixed by removing the level gate
+for movies entirely rather than widening it to one more magic number: every movie-type
+entry now goes straight to _sync_movie_or_collection(), which already has its own correct,
+level-agnostic answer (try a real Kodi movie match; fall back to Kodi's native Movie Set
+-- art/overview only, no rating -- only if that misses). TV keeps its own level check,
+since level there genuinely means show/season/episode and Kodi has no per-season rating
+field to push to. Every collection movie in every collection was silently skipped by
+"Sync Watch History &amp; Ratings Now" and, before v2.4.11 removed it, by the old periodic
+background sync too -- standalone movies (level 0) were never affected, which is exactly
+the asymmetry reported.
+v2.4.11 - Per-user redirect (2026-08-30): "I don't want a separate sync task
+in Kodi for ratings. this needs to happen with the scraper automatically as part of the
+scrape process." Removes the v2.4.8-2.4.10 background rating+resume reconciliation
+entirely: the every-30-minutes thread (SyncEngine.sync_ratings_silent(), and everything
+it called -- the direction-resolution logic, the Kodi-&gt;Chronicle scrobble pull, the
+resume-set builder), plus the now-unused sync_progress setting. That reconciliation now
+happens inline inside the Chronicle_Scraper/tv_addon Kodi scrapers themselves, as part
+of every ordinary scrape (new item, manual "Refresh information", or a rebuild pass) --
+see those addons' own changelogs. This addon's OTHER sync features are unaffected: the
+manual "Sync Watch History &amp; Ratings Now" action (still full rating+art+playcount,
+still on demand), live scrobbling, and art/playcount reconciliation all work exactly as
+before -- only the periodic background rating/resume push is gone.
+v2.4.10 - Per-user follow-up (2026-08-30): "if Chronicle's last watched status
 is older than Kodi's status, Kodi should win. Kodi's data should be added into Chronicle.
 if Chronicle's data is more current than Kodi's, Chronicle's data should sync into Kodi."
 v2.4.9 only ever pushed Chronicle -> Kodi (safely never clobbering a local-only Kodi

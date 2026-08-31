@@ -44,7 +44,6 @@
     <!-- ============================================================================ -->
     <category label="32074">
         <setting id="sync_ratings" type="bool" label="32076" default="true"/>
-        <setting id="sync_progress" type="bool" label="32121" default="true"/>
         <setting id="sync_art" type="bool" label="32077" default="true"/>
         <setting id="sync_playcount" type="bool" label="32078" default="true"/>
         <setting id="sync_watch_history_now" type="action" label="32070" action="RunScript(service.chronicle.scrobbler,action=sync_watch_history)"/>
