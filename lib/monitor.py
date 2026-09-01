@@ -31,8 +31,8 @@ Event flow (ChroniclePlayer):
   onAVStarted / onPlayBackStarted  →  _on_start()
   onPlayBackPaused                 →  tracker ignores polls while paused
   onPlayBackResumed / onPlayBackSeek  →  immediate update
-  onPlayBackEnded                  →  final update + _on_stop()
-  onPlayBackStopped / onPlayBackError →  _on_stop()
+  onPlayBackEnded / onPlayBackStopped →  final update + _on_stop()
+  onPlayBackError                  →  _on_stop()
 
 Background thread (owned by ChronicleMonitor, alongside its abort-loop):
   Wakes every _POLL_SLEEP seconds, calls ChroniclePlayer._send_update().
@@ -118,7 +118,15 @@ class ChroniclePlayer(xbmc.Player):
         self._send_update()
 
     def onPlayBackStopped(self):
-        log.info('Playback stopped')
+        log.info('Playback stopped — sending final update')
+        # Forced, same as onPlayBackEnded -- without this, a manual mid-playback
+        # stop left Chronicle's resume position however stale the last periodic
+        # poll happened to be (up to poll_interval seconds behind, default 30s),
+        # which widened the window in which a second device's own local resume
+        # bookmark looked "further along" than Chronicle actually knew, exactly
+        # backwards from reality. See _maybe_resume_from_chronicle's own doc for
+        # why closing this gap matters now that it does a real comparison.
+        self._send_update(force=True)
         self._on_stop()
 
     def onPlayBackEnded(self):
@@ -178,23 +186,46 @@ class ChroniclePlayer(xbmc.Player):
         if not resumed:
             self._send_update()
 
+    # Chronicle's cross-device percent must clear the local percent by more than
+    # this to be worth a seek -- local and remote positions for the SAME actual
+    # stopping point can differ by a hair from independent percent-of-duration
+    # roundings on two different devices (see UserLibrary.ResumePositionPercent's
+    # own doc on why percent, not seconds, is the portable unit). Without this,
+    # that noise alone could trigger a pointless seek + notification on every
+    # single playback start for a device that's actually already caught up.
+    _RESUME_TOLERANCE_PERCENT = 1.0
+
     def _maybe_resume_from_chronicle(self, media) -> bool:
         """The whole cross-device point of this addon: if a DIFFERENT device left
-        this item partway through, pick up from there on this one. Only when Kodi
-        itself has no local resume bookmark for this item -- if it does, that's
-        this exact device's own prior progress, which is always the more trustworthy
-        answer for "where was I" than a cross-device value that's necessarily a bit
-        stale (only as fresh as the last scrobble Chronicle received), so it wins
-        without even asking Chronicle.
+        this item further along than this one, pick up from there.
+
+        DELIBERATELY always asks Chronicle, even when Kodi already has its own
+        local resume bookmark for this item -- an earlier version returned here
+        immediately whenever media.resume_position > 0, on the theory that a
+        local bookmark is always the more trustworthy answer for "where was I".
+        That reasoning only holds for a device's very FIRST stop on an item: the
+        moment ANY other device continues playback further and reports that
+        progress to Chronicle, this device's own local bookmark is stale, and
+        the old guard meant this method would never run again for that item on
+        this device to notice -- cross-device resume silently stopped working
+        the moment a device had watched even a few seconds of something itself.
+        Confirmed root cause (2026-08-31) of "playback progress isn't making it
+        from one Kodi to the next": it only ever worked once, on a device's
+        first-ever play of a given title.
+
+        The fix: always ask, then seek only if Chronicle's position is actually
+        AHEAD of what's already known locally (never backward -- a stale or
+        unreachable Chronicle response must never regress a device's own
+        further-along position). This also covers the very first play (no local
+        bookmark, local percent is implicitly 0) without a separate code path.
 
         Returns True if a resume seek was actually performed.
         """
-        if media.resume_position > 0:
-            log.debug('Kodi already has a local resume bookmark for this item — not asking Chronicle')
-            return False
         if media.total_time <= 0:
             log.debug('No total duration known yet — cannot convert a resume percent to a seek position')
             return False
+
+        local_percent = (media.resume_position / media.total_time) * 100.0
 
         state = self._client.get_resume_state(media.to_resume_lookup_payload())
         if not isinstance(state, dict):
@@ -205,11 +236,17 @@ class ChroniclePlayer(xbmc.Player):
         if not isinstance(percent, (int, float)) or percent <= 0:
             return False
 
+        if percent <= local_percent + self._RESUME_TOLERANCE_PERCENT:
+            log.debug(
+                "Chronicle's resume ({0:.1f}%) isn't ahead of this device's own ({1:.1f}%) — keeping local".format(
+                    percent, local_percent))
+            return False
+
         seconds = (percent / 100.0) * media.total_time
         try:
             self.seekTime(seconds)
-            log.info('Resumed from Chronicle: {0:.1f}% ({1:.0f}s of {2:.0f}s)'.format(
-                     percent, seconds, media.total_time))
+            log.info('Resumed from Chronicle: {0:.1f}% ({1:.0f}s of {2:.0f}s), ahead of local {3:.1f}%'.format(
+                     percent, seconds, media.total_time, local_percent))
             return True
         except Exception as exc:
             log.warning("Couldn't seek to Chronicle's resume position: {0}".format(exc))
