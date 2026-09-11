@@ -63,11 +63,21 @@ def find_shared_chronicle_url():
 # "timed" call forever, well past whatever timeout= was passed in. Confirmed
 # live against the sibling Chronicle_Scraper addons (2026-08-27), whose own
 # chronicle_client.py carries this exact same watchdog for this exact same
-# reason -- this addon's device_auth.py never adopted it. call_with_timeout()
-# is the backstop: it runs the call on a daemon thread and gives up after
-# timeout + _WATCHDOG_GRACE_SECONDS even if that thread never returns,
-# leaving the runaway thread to die on its own (daemon=True means it can't
-# block Kodi from exiting).
+# reason. call_with_timeout() is the backstop: it runs the call on a daemon
+# thread and gives up after timeout + _WATCHDOG_GRACE_SECONDS even if that
+# thread never returns, leaving the runaway thread to die on its own
+# (daemon=True means it can't block Kodi from exiting).
+#
+# device_auth.py already wraps its own urlopen calls with this. Every method
+# below now does too (2026-09-11) -- they didn't originally, which is a real
+# bug this same investigation found live: scrobble()'s ChroniclePlayer caller
+# holds a "send in flight" flag for the duration of the call (see monitor.py's
+# _send_update), so an unwrapped hang here doesn't just fail once, it wedges
+# scrobbling silently for the rest of the Kodi session -- every later poll
+# tick and playback callback sees the flag still held and no-ops, with
+# nothing in the log to explain why. Confirmed against a real device (Vision,
+# 2026-09-11): scrobbling had silently stopped working entirely, with zero
+# error output anywhere, and only resumed after the addon was reloaded.
 _WATCHDOG_GRACE_SECONDS = 5
 
 
@@ -144,13 +154,23 @@ class ChronicleClient:
 
         req = self._build_request(
             base_url, api_key, '/api/v1/scrobble', data=payload, method='POST')
-        try:
+
+        def _do():
             with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status in (200, 201, 204):
                     log.debug('Scrobble accepted (HTTP {0})'.format(resp.status))
                     return True
                 log.warning('Scrobble returned unexpected HTTP {0}'.format(resp.status))
                 return False
+
+        try:
+            # call_with_timeout, not a bare urlopen -- see this module's own watchdog
+            # doc. Without it, a DNS/connect-phase hang here wedges scrobbling silently
+            # for the rest of the Kodi session: this call runs with self._sending held
+            # True (see monitor.py's ChroniclePlayer._send_update), and every later poll
+            # tick and playback callback sees that flag and no-ops, with nothing in the
+            # log to explain why. Confirmed live (2026-09-11).
+            return call_with_timeout(_do, timeout=10)
         except urllib.error.HTTPError as exc:
             log.error('Scrobble HTTP {0}: {1}'.format(exc.code, exc.reason))
             return False
@@ -195,10 +215,16 @@ class ChronicleClient:
 
         req = self._build_request(
             base_url, api_key, '/api/v1/scrobble/resume', data=payload, method='POST')
-        try:
+
+        def _do():
             with urllib.request.urlopen(req, timeout=10) as resp:
                 body = json.loads(resp.read().decode('utf-8'))
                 return body.get('data') or {}
+
+        try:
+            # call_with_timeout -- see scrobble()'s identical comment; this call sits
+            # on the same playback-start critical path.
+            return call_with_timeout(_do, timeout=10)
         except Exception as exc:
             log.error('get_resume_state failed: {0}'.format(exc))
             return {}
@@ -259,9 +285,13 @@ class ChronicleClient:
 
         req = self._build_request(
             base_url, api_key, '/api/v1/library/{0}'.format(entry_id), data=payload, method='PATCH')
-        try:
+
+        def _do():
             with urllib.request.urlopen(req, timeout=10) as resp:
                 return resp.status in (200, 204)
+
+        try:
+            return call_with_timeout(_do, timeout=10)
         except Exception as exc:
             log.error('update_library_entry({0}) failed: {1}'.format(entry_id, exc))
             return False
@@ -314,11 +344,18 @@ class ChronicleClient:
             return False, 'Chronicle URL is not configured.'
 
         req = self._build_request(base_url, api_key, '/api/health')
-        try:
+
+        def _do():
             with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status == 200:
                     return True, ''
                 return False, 'Unexpected HTTP {0}'.format(resp.status)
+
+        try:
+            # call_with_timeout -- this is called synchronously from the Settings
+            # dialog's "Test Connection" button; without the watchdog, a DNS/connect
+            # hang here freezes that dialog instead of surfacing an error.
+            return call_with_timeout(_do, timeout=10)
         except urllib.error.HTTPError as exc:
             return False, 'HTTP {0}: {1}'.format(exc.code, exc.reason)
         except Exception as exc:
@@ -340,10 +377,14 @@ class ChronicleClient:
             return default
 
         req = self._build_request(base_url, api_key, path)
-        try:
+
+        def _do():
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 body = json.loads(resp.read().decode('utf-8'))
                 return body if not unwrap else body.get('data', default)
+
+        try:
+            return call_with_timeout(_do, timeout=timeout)
         except Exception as exc:
             log.error('{0} failed: {1}'.format(path, exc))
             return default

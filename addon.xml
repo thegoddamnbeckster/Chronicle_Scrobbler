@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.12"
+       version="2.4.13"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,19 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.12 - Bug fix (2026-08-30): "movies inside collections never got their
+    <news>v2.4.13 - Bug fix (2026-09-11): scrobbling could silently stop working for the
+rest of a Kodi session after a single transient network hiccup, with nothing in the log
+to explain why. chronicle_client.py's HTTP calls used urlopen(timeout=10) directly, but
+that timeout only bounds the call once a socket exists -- the DNS lookup beforehand isn't
+covered on any platform, so a dead/unreachable DNS server or a stale hostname can hang the
+call indefinitely. scrobble() holds a "send in flight" flag for the duration of its call;
+an unwrapped hang there left that flag stuck, so every later poll tick and playback
+callback silently no-op'd until the addon was reloaded. All five HTTP call sites now go
+through the existing call_with_timeout() watchdog (already used by device_auth.py, just
+never applied to this file), which gives up after timeout + 5s even if the call never
+returns. Confirmed live against a real device.
+
+v2.4.12 - Bug fix (2026-08-30): "movies inside collections never got their
 rating" -- confirmed and fixed, then corrected per-user follow-up ("why are you gating
 the hierarchy level? shouldn't everything that can be rated be allowed?"). _sync_entry()'s
 dispatch only routed a movie to _sync_movie_or_collection() (rating/art/playcount push)
