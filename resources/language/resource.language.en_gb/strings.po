@@ -203,24 +203,6 @@ msgctxt "#32069"
 msgid "Cancel"
 msgstr ""
 
-# ── Chronicle -> Kodi sync (Phase 1) ──────────────────────────────────────────
-
-msgctxt "#32070"
-msgid "Sync Watch History & Ratings Now"
-msgstr ""
-
-msgctxt "#32071"
-msgid "Fetching your Chronicle library…"
-msgstr ""
-
-msgctxt "#32072"
-msgid "Syncing: {0}"
-msgstr ""
-
-msgctxt "#32073"
-msgid "Done! {0} synced, {1} skipped, {2} failed."
-msgstr ""
-
 msgctxt "#32079"
 msgid "Not configured yet — opening settings so you can enter your Chronicle server and connect."
 msgstr ""
@@ -267,22 +249,6 @@ msgstr ""
 
 msgctxt "#32074"
 msgid "Sync (Chronicle -> Kodi)"
-msgstr ""
-
-msgctxt "#32075"
-msgid "What to sync"
-msgstr ""
-
-msgctxt "#32076"
-msgid "Sync ratings"
-msgstr ""
-
-msgctxt "#32077"
-msgid "Sync artwork"
-msgstr ""
-
-msgctxt "#32078"
-msgid "Sync play counts / last played"
 msgstr ""
 
 msgctxt "#32110"

@@ -178,19 +178,6 @@ class ChronicleClient:
             log.error('Scrobble failed: {0}'.format(exc))
             return False
 
-    def get_watch_summary(self, media_item_id: int) -> dict:
-        """GET /api/v1/scrobble/summary/{mediaItemId}.
-
-        Returns {'lastWatchedAt': iso-str|None, 'watchedCount': int}, or
-        {'lastWatchedAt': None, 'watchedCount': 0} on any error (matches the
-        server's own "no watches yet" response shape, so callers don't need
-        a separate error branch just to treat it as "nothing known").
-        """
-        empty = {'lastWatchedAt': None, 'watchedCount': 0}
-        return self._get_json(
-            '/api/v1/scrobble/summary/{0}'.format(media_item_id), default=empty
-        ) or empty
-
     def get_resume_state(self, payload: dict) -> dict:
         """POST /api/v1/scrobble/resume — the cross-device "resume where I left off"
         check, called on playback start before this device has any local resume
@@ -229,43 +216,7 @@ class ChronicleClient:
             log.error('get_resume_state failed: {0}'.format(exc))
             return {}
 
-    def get_media(self, media_id: int) -> dict:
-        """GET /api/v1/media/{id} — full MediaItemDto, including Ancestors.
-
-        Used by sync_engine.py to resolve an episode's season number (the season's
-        own MediaItem.Number) since AncestorDto only carries id+number.
-        """
-        return self._get_json('/api/v1/media/{0}'.format(media_id), default={}) or {}
-
     # ── library (ratings, status) ────────────────────────────────────────────
-
-    def get_library(self, status: str, page: int = 1, per_page: int = 100) -> dict:
-        """GET /api/v1/library?status=&page=&perPage= — one page of the user's
-        library entries for a given status. Returns the raw {'data': [...],
-        'pagination': {...}} response dict, or {} on error."""
-        return self._get_json(
-            '/api/v1/library?status={0}&page={1}&perPage={2}'.format(status, page, per_page),
-            default={}, timeout=15, unwrap=False,
-        ) or {}
-
-    def iter_library_all_statuses(self):
-        """Yield every LibraryEntryDto across all statuses, paginating each.
-
-        Generator so sync_engine.py can update a progress bar per item without
-        needing to know the total count ahead of time.
-        """
-        for status in ('Watching', 'Completed', 'Dropped', 'PlanToWatch', 'OnHold', 'Rewatching'):
-            page = 1
-            while True:
-                body = self.get_library(status, page=page, per_page=100)
-                entries = body.get('data') or []
-                if not entries:
-                    break
-                for entry in entries:
-                    yield entry
-                if len(entries) < 100:
-                    break
-                page += 1
 
     def update_library_entry(self, entry_id: int, user_rating=None, status: str = None) -> bool:
         """PATCH /api/v1/library/{id} — used only for user-initiated rating/status
@@ -367,8 +318,9 @@ class ChronicleClient:
                   warn_unconfigured: str = None):
         """Shared GET-and-parse-JSON helper: builds the request from one atomic
         settings snapshot, sends it, and returns body['data'] (or the whole body
-        when unwrap=False, for endpoints like get_library() whose caller wants
-        'pagination' too) -- `default` on any failure, including "not configured"."""
+        when unwrap=False, for an endpoint whose caller wants the envelope's other
+        fields -- e.g. 'pagination' -- too) -- `default` on any failure, including
+        "not configured"."""
         base_url, api_key = self._settings()
         if not base_url or not api_key:
             if warn_unconfigured:

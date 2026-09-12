@@ -43,10 +43,12 @@
     <!-- Sync (Chronicle -> Kodi) -->
     <!-- ============================================================================ -->
     <category label="32074">
-        <setting id="sync_ratings" type="bool" label="32076" default="true"/>
-        <setting id="sync_art" type="bool" label="32077" default="true"/>
-        <setting id="sync_playcount" type="bool" label="32078" default="true"/>
-        <setting id="sync_watch_history_now" type="action" label="32070" action="RunScript(service.chronicle.scrobbler,action=sync_watch_history)"/>
+        <!-- Rating/art/playcount sync moved entirely to the scrapers (2026-09-12): TV to
+             script.chronicle.scraper.tv, movies to script.chronicle.scraper.movie -- each
+             already pushes the same fields as an unconditional part of every ordinary scrape
+             (see those addons' own tvshow_scraper.py/scraper.py), and this addon's own separate
+             VideoLibrary.Set*Details push duplicated that work via a second, uncoordinated
+             mechanism with its own settings surface. -->
         <setting id="sync_lists_now" type="action" label="32050" action="RunScript(service.chronicle.scrobbler,action=sync_lists)"/>
     </category>
 

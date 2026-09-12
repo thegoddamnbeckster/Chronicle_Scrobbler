@@ -22,7 +22,6 @@ from lib.chronicle_client import ChronicleClient, find_shared_chronicle_url
 from lib.reset_manager import ResetManager
 from lib.device_auth import DeviceAuthManager
 from lib.playlist_sync import PlaylistSync
-from lib.sync_engine import SyncEngine
 
 ADDON = xbmcaddon.Addon()
 log   = Logger('default')
@@ -133,9 +132,6 @@ def show_menu():
         return
     if args.get('action') == 'test_connection':
         _test_connection()
-        return
-    if args.get('action') == 'sync_watch_history':
-        _sync_watch_history()
         return
     if args.get('action') == 'reset_tv':
         ResetManager().prompt_reset_tvshow()
@@ -272,16 +268,6 @@ def _sync_lists():
     xbmcgui.Dialog().ok(
         ADDON.getLocalizedString(32050),   # "Sync Lists to Kodi"
         ADDON.getLocalizedString(32055).format(synced, failed),  # "Done! {0} written, {1} failed."
-    )
-
-
-def _sync_watch_history():
-    """Bulk Chronicle -> Kodi sync: ratings, art, and playcount/lastplayed reconciliation."""
-    result = SyncEngine().sync_all()
-    xbmcgui.Dialog().ok(
-        ADDON.getLocalizedString(32070),   # "Sync Watch History & Ratings Now"
-        ADDON.getLocalizedString(32073).format(result.synced, result.skipped, result.failed),
-        # "Done! {0} synced, {1} skipped, {2} failed."
     )
 
 

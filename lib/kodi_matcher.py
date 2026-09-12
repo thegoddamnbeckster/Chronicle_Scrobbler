@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 """Matches a Chronicle media item against Kodi's video library.
 
-Factored out of playlist_sync.py so both playlist_sync.py and sync_engine.py
-share one matching implementation instead of two. ID-priority chain confirmed
-against a real Kodi 21+ library:
+Originally factored out of playlist_sync.py to share one matching implementation with
+sync_engine.py's own bulk rating/art/playcount sync -- that responsibility moved entirely to
+the movie/TV scraper addons (2026-09-12; see those addons' own tvshow_scraper.py/scraper.py,
+which already push the same fields as an unconditional part of every ordinary scrape), so
+playlist_sync.py is this module's only caller now. ID-priority chain confirmed against a real
+Kodi 21+ library:
 
   movies:   uniqueid.imdb -> uniqueid.tmdb -> imdbnumber (legacy, sometimes a
             TMDB numeric id instead of a real IMDB id — only trusted when it
@@ -17,9 +20,8 @@ from lib.media_info import KodiJsonRpc
 
 log = Logger('kodi_matcher')
 
-# 'file' is included for every entity so playlist_sync.py can build .m3u paths
-# from the same lookups sync_engine.py uses for rating/playcount/art reconciliation
-# — one matching implementation, every caller gets what it needs from one call.
+# 'file' is included for every entity so playlist_sync.py can build .m3u paths from these
+# same lookups.
 _MOVIE_PROPS   = ['title', 'year', 'imdbnumber', 'uniqueid', 'userrating', 'playcount', 'lastplayed', 'art', 'file']
 _SHOW_PROPS    = ['title', 'year', 'imdbnumber', 'uniqueid', 'userrating']
 _EPISODE_PROPS = ['title', 'season', 'episode', 'tvshowid', 'userrating', 'playcount', 'lastplayed', 'art', 'file']
@@ -53,29 +55,6 @@ def find_movie(external_ids: dict, title: str, year=None) -> dict:
             if str(m.get('year', '')) == str(year):
                 return m
     return movies[0] if movies else None
-
-
-def find_movie_set(title: str) -> dict:
-    """Return the matching Kodi Movie Set (collection) dict, or None.
-
-    Chronicle models a movie collection as a plain MediaItem container (HierarchyLevel
-    0, movies-type, with movie children) — it has no external IDs of its own, no
-    watch/rating concept the way a real movie does. Kodi's native counterpart is a
-    Movie Set (VideoLibrary.GetMovieSets / SetMovieSetDetails), which only takes a
-    title, plot, and art — no userrating/playcount. Matched by title only; used as a
-    fallback in sync_engine.py when find_movie() finds nothing for a root item (i.e.
-    it's a collection container, not an individual watchable movie).
-    """
-    if not title:
-        return None
-    result = KodiJsonRpc.call('VideoLibrary.GetMovieSets', {
-        'properties': ['title', 'art'],
-    })
-    sets = result.get('sets', [])
-    for s in sets:
-        if s.get('title', '').strip().lower() == title.strip().lower():
-            return s
-    return None
 
 
 def find_tvshow(external_ids: dict, title: str) -> dict:

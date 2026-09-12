@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.13"
+       version="2.4.14"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,16 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.13 - Bug fix (2026-09-11): scrobbling could silently stop working for the
+    <news>v2.4.14 - Removed this addon's own rating/artwork/play-count sync to Kodi (the "Sync
+ratings"/"Sync artwork"/"Sync play counts" settings and "Sync Watch History &amp; Ratings Now"
+action). Per-user decision (2026-09-12): that responsibility belongs entirely to the movie and
+TV scraper addons now, which already push the same fields as an unconditional part of every
+ordinary scrape -- this addon's own separate VideoLibrary.Set*Details push duplicated that work
+via a second, uncoordinated mechanism with its own settings surface. Movie-collection art
+(previously this addon's own Movie Set fallback) moves to script.chronicle.scraper.movie as its
+own periodic task. Playlist sync (unrelated) and its own "Sync Lists Now" action are unaffected.
+
+v2.4.13 - Bug fix (2026-09-11): scrobbling could silently stop working for the
 rest of a Kodi session after a single transient network hiccup, with nothing in the log
 to explain why. chronicle_client.py's HTTP calls used urlopen(timeout=10) directly, but
 that timeout only bounds the call once a socket exists -- the DNS lookup beforehand isn't

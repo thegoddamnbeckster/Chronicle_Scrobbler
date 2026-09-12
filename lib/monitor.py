@@ -55,7 +55,6 @@ from lib.logger import Logger
 from lib.chronicle_client import ChronicleClient
 from lib.media_info import MediaInfo
 from lib.progress_tracker import ProgressTracker
-from lib.sync_engine import SyncEngine
 
 ADDON = xbmcaddon.Addon()
 log   = Logger('monitor')
