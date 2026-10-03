@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.4.15"
+       version="2.4.16"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,9 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.4.15 - Fixes the clean-up that is meant to run after every library scan. It called VideoLibrary.Clean with a misspelled option (showdialog instead of showdialogs), which Kodi rejects, so it has never actually run: movies whose folders were renamed or moved kept a stale duplicate entry (and Kodi warned "Process directory ... does not exist" for each on every start). It now runs, and a rejected call is logged as an error instead of as "triggered".
+    <news>v2.4.16 - Removed the clean-up this add-on ran after every library scan (VideoLibrary.Clean). Scanning for new items is not the place to clean the library, and it only started working in v2.4.15 (before that Kodi rejected the call, so it never ran). This add-on no longer does anything when a scan finishes. To remove entries for files that were moved or renamed, use Kodi's own Settings > Media > Library > Videos > Clean library, when you choose.
+
+v2.4.15 - Fixes the clean-up that is meant to run after every library scan. It called VideoLibrary.Clean with a misspelled option (showdialog instead of showdialogs), which Kodi rejects, so it has never actually run: movies whose folders were renamed or moved kept a stale duplicate entry (and Kodi warned "Process directory ... does not exist" for each on every start). It now runs, and a rejected call is logged as an error instead of as "triggered".
 
 v2.4.14 - Removed this addon's own rating/artwork/play-count sync to Kodi (the "Sync
 ratings"/"Sync artwork"/"Sync play counts" settings and "Sync Watch History &amp; Ratings Now"

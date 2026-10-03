@@ -167,10 +167,11 @@ A run of stability fixes on top of the Phase 1 release: the device-auth QR flow 
 actually renders reliably (several fixes to VFS path handling, PNG color type, and
 per-attempt cache-busting filenames), the connect dialog got a real backdrop and
 styled buttons, device names sent to Chronicle prefer the machine's real hostname
-over Kodi's own arbitrary FriendlyName, and `VideoLibrary.Clean` now runs
-automatically after a scan — Kodi's "Set Content" re-scan toggle alone doesn't clear
-stale (moved/renamed/deleted) library entries. See `addon.xml`'s own `<news>` block
-for the full per-version changelog.
+over Kodi's own arbitrary FriendlyName. (A `VideoLibrary.Clean` after every scan was
+added in this period and removed again in 2.4.16: scanning for new items is not the
+place to clean the library. To remove entries for moved/renamed/deleted files, use
+Kodi's own Settings > Media > Library > Videos > Clean library.) See `addon.xml`'s
+own `<news>` block for the full per-version changelog.
 
 ## Known Limitations (Phase 1)
 
