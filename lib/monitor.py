@@ -69,6 +69,14 @@ _POLL_SLEEP = 5
 # 50s apart from a single content-settings toggle).
 _CLEAN_THROTTLE_SECONDS = 120
 
+# VideoLibrary.Clean's parameters, exactly as Kodi names them (JSONRPC.Introspect: showdialogs,
+# content, directory). This used to be {'showdialog': False} -- missing the "s" -- which Kodi
+# rejects outright ("Too many parameters"), so the clean-up after a scan NEVER ran: moved or
+# renamed folders left stale duplicate entries behind indefinitely (seen 2026-10-03: four movies
+# whose folders had been renamed to the correct year still had their old entries, and Kodi warned
+# "Process directory ... does not exist" for each on every start).
+_CLEAN_PARAMS = {'showdialogs': False}
+
 # Cross-addon signal directory: this addon (Chronicle_Scrobbler) writes one file here
 # per watched session, and the separate script.chronicle.rating addon's own background
 # service watches it and prompts for a rating. special://temp/ (not addon_data/) so it's
@@ -445,12 +453,23 @@ class ChronicleMonitor(xbmc.Monitor):
                 'jsonrpc': '2.0',
                 'id': 1,
                 'method': 'VideoLibrary.Clean',
-                'params': {'showdialog': False},
+                'params': dict(_CLEAN_PARAMS),
             }))
-            log.info('VideoLibrary.Clean triggered: {0}'.format(response))
         except Exception as exc:
             log.error("Couldn't trigger VideoLibrary.Clean: {0}".format(exc))
             return
+
+        # Kodi answers a bad call with JSON carrying an "error", not an exception -- which is how
+        # the wrong parameter above went unnoticed: it was logged as "triggered". A rejected call
+        # is an error, and must not start the throttle window as if it had run.
+        try:
+            error = json.loads(response).get('error')
+        except (ValueError, AttributeError, TypeError):
+            error = None
+        if error:
+            log.error('VideoLibrary.Clean was rejected by Kodi: {0}'.format(error))
+            return
+        log.info('VideoLibrary.Clean triggered: {0}'.format(response))
 
         try:
             f = xbmcvfs.File(marker, 'w')
