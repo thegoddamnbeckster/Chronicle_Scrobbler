@@ -59,6 +59,20 @@ Copy-Item "$projectRoot\resources" "$sourcePath\resources" -Recurse -Force
 Get-ChildItem -Path $sourcePath -Directory -Recurse -Filter "__pycache__" -ErrorAction SilentlyContinue |
     Remove-Item -Recurse -Force
 Write-Host "  Copied: lib/, resources/ (cleaned __pycache__)"
+
+# Modules shared by every Chronicle Kodi add-on live in ONE place, Chronicle_Scraper\shared (this add-on takes only the ones it uses);
+# copied into lib\ here so the zip is self-contained.
+$sharedDir = Join-Path $projectRoot "..\Chronicle_Scraper\shared"
+if (-not (Test-Path $sharedDir)) {
+    Write-Error "Shared modules not found at $sharedDir -- check out Chronicle_Scraper next to this repository."
+    exit 1
+}
+foreach ($name in @("logger.py", "redact.py", "http_core.py", "device_name.py", "device_auth.py", "qr_dialog.py", "connection_ui.py")) {
+    $src = Join-Path $sharedDir $name
+    if (-not (Test-Path $src)) { Write-Error "Missing shared module: $name"; exit 1 }
+    Copy-Item $src (Join-Path $sourcePath "lib\$name") -Force
+    Write-Host "  Shared module: $name"
+}
 Write-Host "  build_temp ready."
 
 # Step 2: Create ZIP

@@ -268,6 +268,12 @@ class ChroniclePlayer(xbmc.Player):
 
     def _send_update(self, force: bool = False) -> None:
         """Send a scrobble if the tracker decides one is due."""
+        # Idle ticks are the common case (the poll thread wakes every few seconds all day): answer them from our own state, before
+        # spending up to three JSON-RPC round trips on a snapshot of what is playing.
+        with self._lock:
+            if not self._tracker.has_session or self._sending:
+                return
+
         media = MediaInfo.get_current()
         if media is None:
             return
@@ -278,7 +284,8 @@ class ChroniclePlayer(xbmc.Player):
             # call below -- without this guard, the poll thread (every _POLL_SLEEP
             # seconds) and a Kodi callback thread (e.g. onPlayBackSeek) can both pass
             # the gate before either records, sending duplicate scrobbles for the same
-            # moment. Only one send is ever in flight per session.
+            # moment. Only one send is ever in flight per session. (Re-checked: the
+            # session may have ended while the snapshot above was being taken.)
             if not self._tracker.has_session or self._sending:
                 return
             if not (force or self._tracker.should_scrobble(media, now)):

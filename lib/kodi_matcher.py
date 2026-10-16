@@ -23,7 +23,7 @@ log = Logger('kodi_matcher')
 # 'file' is included for every entity so playlist_sync.py can build .m3u paths from these
 # same lookups.
 _MOVIE_PROPS   = ['title', 'year', 'imdbnumber', 'uniqueid', 'userrating', 'playcount', 'lastplayed', 'art', 'file']
-_SHOW_PROPS    = ['title', 'year', 'imdbnumber', 'uniqueid', 'userrating']
+_SHOW_PROPS    = ['title', 'year', 'imdbnumber', 'uniqueid', 'userrating']  # tvshowid is always returned
 _EPISODE_PROPS = ['title', 'season', 'episode', 'tvshowid', 'userrating', 'playcount', 'lastplayed', 'art', 'file']
 
 
@@ -73,6 +73,19 @@ def find_tvshow(external_ids: dict, title: str) -> dict:
     })
     shows = result.get('tvshows', [])
     return shows[0] if shows else None
+
+
+def get_show_episodes(tvshow_id: int) -> list:
+    """Every episode Kodi has for a show, in season/episode order (each with its 'file'). A show itself has no playable file -- only
+    a folder -- so a playlist entry for a show is its episodes."""
+    if tvshow_id is None:
+        return []
+    result = KodiJsonRpc.call('VideoLibrary.GetEpisodes', {
+        'tvshowid':   tvshow_id,
+        'properties': _EPISODE_PROPS,
+    })
+    episodes = [e for e in result.get('episodes', []) if e.get('file')]
+    return sorted(episodes, key=lambda e: (e.get('season', 0), e.get('episode', 0)))
 
 
 def find_episode(tvshow_id: int, season: int, episode: int) -> dict:

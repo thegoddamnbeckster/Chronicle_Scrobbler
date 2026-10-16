@@ -8,97 +8,23 @@ Authentication: X-Api-Key header (Chronicle scrobbler API key).
 """
 
 import json
-import threading
 import urllib.request
 import urllib.error
 import xbmcaddon
 
+from lib.http_core import (
+    api_headers, call_with_timeout, find_shared_chronicle_url as _find_shared_url, normalize_base_url, user_agent)
 from lib.logger import Logger
 
 ADDON = xbmcaddon.Addon()
 log   = Logger('client')
 
-_USER_AGENT = 'Kodi/Chronicle-Scrobbler/1.0'
-
-# Every OTHER Chronicle addon that independently asks the user for its own
-# chronicle_url -- used by find_shared_chronicle_url() below. Chronicle_Rating is
-# deliberately NOT here: it already reuses Chronicle_Scrobbler's saved connection
-# outright rather than asking for a URL of its own at all.
-_SIBLING_CHRONICLE_ADDON_IDS = (
-    'script.chronicle.scraper.movie',
-    'script.chronicle.scraper.tv',
-    'service.chronicle.scrobbler',
-)
+_USER_AGENT = user_agent(ADDON.getAddonInfo('id'))
 
 
 def find_shared_chronicle_url():
-    """Per-user request (2026-08-29): "each of the add-ons could check each other
-    for the chronicle URL and just copy it in from another working add-on... save
-    the typing." Checks every OTHER installed sibling Chronicle addon's own
-    chronicle_url setting (read-only from here -- this never writes to another
-    addon's settings, only reads) and returns the first non-blank one found, so
-    the "Edit Connection" URL prompt can be pre-filled instead of starting blank.
-    A sibling with nothing set of its own (fresh install, never configured) is
-    silently skipped, not treated as "the shared URL is blank" -- only a REAL,
-    already-working URL from another addon is ever offered. Returns None if no
-    sibling is installed, or none of the installed ones have a URL set yet.
-    """
-    this_id = ADDON.getAddonInfo('id')
-    for addon_id in _SIBLING_CHRONICLE_ADDON_IDS:
-        if addon_id == this_id:
-            continue
-        try:
-            other = xbmcaddon.Addon(addon_id)
-        except RuntimeError:
-            continue  # not installed on this device
-        url = (other.getSetting('chronicle_url') or '').strip()
-        if url:
-            log.info('find_shared_chronicle_url: found {0!r} from {1}'.format(url, addon_id))
-            return url
-    return None
-
-# urlopen(timeout=N) only bounds the socket once it exists -- the DNS lookup
-# (getaddrinfo) that happens before that is NOT covered by that timeout on
-# any platform. A dead/unreachable DNS server or a stale hostname can hang a
-# "timed" call forever, well past whatever timeout= was passed in. Confirmed
-# live against the sibling Chronicle_Scraper addons (2026-08-27), whose own
-# chronicle_client.py carries this exact same watchdog for this exact same
-# reason. call_with_timeout() is the backstop: it runs the call on a daemon
-# thread and gives up after timeout + _WATCHDOG_GRACE_SECONDS even if that
-# thread never returns, leaving the runaway thread to die on its own
-# (daemon=True means it can't block Kodi from exiting).
-#
-# device_auth.py already wraps its own urlopen calls with this. Every method
-# below now does too (2026-09-11) -- they didn't originally, which is a real
-# bug this same investigation found live: scrobble()'s ChroniclePlayer caller
-# holds a "send in flight" flag for the duration of the call (see monitor.py's
-# _send_update), so an unwrapped hang here doesn't just fail once, it wedges
-# scrobbling silently for the rest of the Kodi session -- every later poll
-# tick and playback callback sees the flag still held and no-ops, with
-# nothing in the log to explain why. Confirmed against a real device (Vision,
-# 2026-09-11): scrobbling had silently stopped working entirely, with zero
-# error output anywhere, and only resumed after the addon was reloaded.
-_WATCHDOG_GRACE_SECONDS = 5
-
-
-def call_with_timeout(fn, timeout):
-    result = {}
-
-    def _target():
-        try:
-            result['value'] = fn()
-        except BaseException as exc:
-            result['error'] = exc
-
-    t = threading.Thread(target=_target, daemon=True)
-    t.start()
-    t.join(timeout + _WATCHDOG_GRACE_SECONDS)
-    if t.is_alive():
-        raise TimeoutError('no response within {0}s (DNS/network hang)'.format(
-            timeout + _WATCHDOG_GRACE_SECONDS))
-    if 'error' in result:
-        raise result['error']
-    return result.get('value')
+    """Another installed Chronicle add-on's saved server address, to pre-fill the "Edit Connection" prompt (see http_core)."""
+    return _find_shared_url(ADDON.getAddonInfo('id'), log)
 
 
 class ChronicleClient:
@@ -111,7 +37,7 @@ class ChronicleClient:
         # so a concurrent refresh_settings() (e.g. right after device-auth completes)
         # can never hand one method a mix of the old URL and the new key or vice versa.
         self._settings_tuple = (
-            ADDON.getSetting('chronicle_url').rstrip('/'),
+            normalize_base_url(ADDON.getSetting('chronicle_url')),
             ADDON.getSetting('api_key'),
         )
 
@@ -122,7 +48,7 @@ class ChronicleClient:
         the newly saved API key without needing to be reconstructed.
         """
         self._settings_tuple = (
-            ADDON.getSetting('chronicle_url').rstrip('/'),
+            normalize_base_url(ADDON.getSetting('chronicle_url')),
             ADDON.getSetting('api_key'),
         )
 
@@ -249,13 +175,15 @@ class ChronicleClient:
 
     # ── lists ─────────────────────────────────────────────────────────────────
 
-    def get_lists(self) -> list:
+    def get_lists(self):
         """GET /api/v1/lists — return all lists for the authenticated user.
 
         Returns a list of list-summary dicts (id, name, isOrdered, itemCount,
-        description) or an empty list on error.
+        description), [] when the user has no lists, or None when the request
+        failed (so "nothing to sync" and "could not ask" are not the same answer).
         """
-        return self._get_json('/api/v1/lists', default=[], warn_unconfigured='get_lists') or []
+        lists = self._get_json('/api/v1/lists', default=None, warn_unconfigured='get_lists')
+        return lists if isinstance(lists, list) else None
 
     def get_list(self, list_id: int) -> dict:
         """GET /api/v1/lists/{id} — return a single list with all its items.
@@ -343,11 +271,7 @@ class ChronicleClient:
 
     def _build_request(self, base_url: str, api_key: str, path: str,
                         data=None, method: str = 'GET') -> urllib.request.Request:
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Api-Key':    api_key,
-            'User-Agent':   _USER_AGENT,
-        }
+        headers = api_headers(api_key, _USER_AGENT)
         body = json.dumps(data).encode('utf-8') if data is not None else None
         return urllib.request.Request(
             '{0}{1}'.format(base_url, path), data=body, headers=headers, method=method)

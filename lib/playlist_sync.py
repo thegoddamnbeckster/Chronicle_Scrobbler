@@ -39,16 +39,18 @@ class PlaylistSync:
     def sync_all(self) -> tuple:
         """Sync all Chronicle lists to Kodi playlists.
 
-        Returns (lists_synced, lists_failed).
+        Returns (lists_synced, lists_failed), or None when Chronicle could not be asked for its lists
+        (not connected, unreachable) -- distinct from a connected account that simply has no lists, (0, 0).
         """
         lists = self._client.get_lists()
         if lists is None:
             log.error('Failed to fetch lists from Chronicle')
-            return 0, 0
+            return None
 
         synced = 0
         failed = 0
         total  = len(lists)
+        used_filenames = set()
 
         pbar = xbmcgui.DialogProgress()
         pbar.create(
@@ -70,7 +72,7 @@ class PlaylistSync:
                 failed += 1
                 continue
 
-            ok = self._write_playlist(detail)
+            ok = self._write_playlist(detail, used_filenames)
             if ok:
                 synced += 1
             else:
@@ -81,8 +83,11 @@ class PlaylistSync:
 
     # ── private — playlist creation ────────────────────────────────────────────
 
-    def _write_playlist(self, lst: dict) -> bool:
-        """Write a single Chronicle list as an .m3u file in Kodi's playlist directory."""
+    def _write_playlist(self, lst: dict, used_filenames: set = None) -> bool:
+        """Write a single Chronicle list as an .m3u file in Kodi's playlist directory.
+
+        used_filenames: names already written in this sync; a list whose sanitised name collides with one of them
+        ("A/B" and "A_B" both become "A_B") gets its Chronicle id appended instead of overwriting the earlier playlist."""
         name    = lst.get('name', 'Untitled List')
         items   = lst.get('items', [])
         ordered = lst.get('isOrdered', True)
@@ -99,21 +104,22 @@ class PlaylistSync:
         matched = 0
 
         for entry in items:
-            media   = entry.get('mediaItem', {})
-            mtype   = media.get('mediaTypeName', '').lower()
-            ext_ids = {e['source']: e['externalId'] for e in media.get('externalIds', [])}
+            media   = entry.get('mediaItem', {}) or {}
+            mtype   = (media.get('mediaTypeName') or '').lower()
+            ext_ids = {e['source']: e['externalId'] for e in media.get('externalIds', []) or []}
             title   = media.get('name', '')
             year    = media.get('year')
             runtime = (media.get('runtimeMinutes') or 0) * 60  # seconds
 
-            filepath = self._resolve_filepath(mtype, ext_ids, title, year)
-            if not filepath:
+            entries = self._resolve_entries(mtype, ext_ids, title, year, runtime)
+            if not entries:
                 log.warning('Could not resolve path for: {0}'.format(title))
                 lines.append('# NOT FOUND: {0}'.format(title))
                 continue
 
-            lines.append('#EXTINF:{0},{1}'.format(int(runtime), title))
-            lines.append(filepath)
+            for label, seconds, filepath in entries:
+                lines.append('#EXTINF:{0},{1}'.format(int(seconds), label))
+                lines.append(filepath)
             matched += 1
 
         if matched == 0:
@@ -121,8 +127,12 @@ class PlaylistSync:
             return False
 
         # Sanitize name for filesystem
-        safe_name = ''.join(c if c.isalnum() or c in ' _-.' else '_' for c in name).strip()
-        filename  = 'chronicle_{0}.m3u'.format(safe_name.replace(' ', '_'))
+        safe_name = ''.join(c if c.isalnum() or c in ' _-.' else '_' for c in name).strip().replace(' ', '_') or 'Untitled'
+        filename  = 'chronicle_{0}.m3u'.format(safe_name)
+        if used_filenames is not None:
+            if filename.lower() in used_filenames:
+                filename = 'chronicle_{0}_{1}.m3u'.format(safe_name, lst.get('id', len(used_filenames)))
+            used_filenames.add(filename.lower())
         path      = xbmcvfs.translatePath(_PLAYLIST_DIR + filename)
 
         try:
@@ -137,15 +147,20 @@ class PlaylistSync:
 
     # ── private — Kodi library lookup ──────────────────────────────────────────
 
-    def _resolve_filepath(self, media_type: str, ext_ids: dict, title: str, year) -> str:
-        """Return the file path for a media item from the Kodi library, or ''."""
+    def _resolve_entries(self, media_type: str, ext_ids: dict, title: str, year, runtime: float) -> list:
+        """The playlist entries [(label, seconds, path), ...] for one Chronicle list item, from the Kodi library -- one for a movie,
+        one per episode for a TV show -- or [] when Kodi does not have it. A show never falls through to a movie of the same name."""
         if 'episode' in media_type or 'tv' in media_type:
-            # Chronicle list items don't carry season/episode context here — this
-            # path realistically only resolves shows/movies. Fall through to movie
-            # lookup for anything not clearly an episode.
             show = kodi_matcher.find_tvshow(ext_ids, title)
-            if show:
-                return show.get('file', '')
+            if not show:
+                return []
+            return [
+                ('{0} S{1:02d}E{2:02d}'.format(title or show.get('title', ''), e.get('season', 0), e.get('episode', 0)),
+                 -1, e['file'])
+                for e in kodi_matcher.get_show_episodes(show.get('tvshowid'))
+            ]
 
         movie = kodi_matcher.find_movie(ext_ids, title, year)
-        return movie.get('file', '') if movie else ''
+        if not movie or not movie.get('file'):
+            return []
+        return [(title, runtime, movie['file'])]

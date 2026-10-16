@@ -24,10 +24,17 @@ _ITEM_PROPS = [
     'imdbnumber',   # IMDB id for movies; sometimes TMDB id
     'uniqueid',     # dict: {'imdb': '...', 'tmdb': '...', 'tvdb': '...'}
     'file',
+    'tvshowid',     # episodes: the owning show's library id (its ids identify the show, the episode's own do not)
     'duration',     # duration in seconds (audio)
     'runtime',      # runtime in seconds (video)
     'resume',       # {'position': float, 'total': float}
 ]
+
+# Show-level ids per library tvshowid. An episode's own uniqueid/imdbnumber identify the EPISODE; Chronicle reads externalIds as the
+# SHOW's and stores them on it, so sending the episode's would attach episode ids to the show (and could match a different show whose
+# id happens to equal the episode's). The show's ids hardly ever change, so they are fetched once per show, not every poll tick.
+_SHOW_IDS_CACHE_MAX = 64
+_show_ids_cache = {}
 
 # ── Player properties requested from Player.GetProperties ─────────────────────
 _PLAYER_PROPS = [
@@ -63,10 +70,12 @@ class KodiJsonRpc:
 class MediaInfo:
     """Snapshot of the currently-playing media item and its playback state."""
 
-    def __init__(self, player_id: int, item: dict, props: dict):
+    def __init__(self, player_id: int, item: dict, props: dict, show_details: dict = None):
         self._player_id = player_id
         self._item      = item
         self._props     = props
+        # The owning show's {'uniqueid', 'imdbnumber'} for an episode (None for everything else).
+        self._show_details = show_details
 
     # ── factory ────────────────────────────────────────────────────────────────
 
@@ -97,7 +106,11 @@ class MediaInfo:
             'properties': _PLAYER_PROPS,
         })
 
-        return cls(player_id, item, props)
+        show_details = None
+        if item.get('type') == 'episode':
+            show_details = _get_show_details(item.get('tvshowid'))
+
+        return cls(player_id, item, props, show_details)
 
     # ── accessors ──────────────────────────────────────────────────────────────
 
@@ -206,8 +219,15 @@ class MediaInfo:
         """
         ids = {}
 
+        # An episode is identified by its SHOW's ids (see _show_ids_cache); when the show could not be looked up, send none rather than
+        # the episode's own, which would be stored on the show.
+        if self.media_type == 'episode':
+            source = self._show_details or {}
+        else:
+            source = self._item
+
         # uniqueid is populated by scrapers and contains the most reliable data
-        unique = self._item.get('uniqueid', {}) or {}
+        unique = source.get('uniqueid', {}) or {}
         for key in ('imdb', 'tmdb', 'tvdb', 'musicbrainz'):
             val = str(unique.get(key, '') or '').strip()
             if val:
@@ -218,7 +238,7 @@ class MediaInfo:
         # TMDB numeric id instead of a real "tt..." IMDB id, so it's only trusted when
         # it actually looks like one.
         if 'imdb' not in ids:
-            imdb = str(self._item.get('imdbnumber', '') or '').strip()
+            imdb = str(source.get('imdbnumber', '') or '').strip()
             if imdb.startswith('tt'):
                 ids['imdb'] = imdb
             elif imdb.isdigit() and 'tmdb' not in ids:
@@ -272,6 +292,26 @@ class MediaInfo:
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
+
+def _get_show_details(tvshow_id):
+    """{'uniqueid', 'imdbnumber'} of a library TV show, or None when unknown. Successful lookups are cached; failures are not, so
+    the next poll tick tries again."""
+    if not isinstance(tvshow_id, int) or tvshow_id <= 0:
+        return None
+    cached = _show_ids_cache.get(tvshow_id)
+    if cached is not None:
+        return cached
+    details = KodiJsonRpc.call('VideoLibrary.GetTVShowDetails', {
+        'tvshowid':   tvshow_id,
+        'properties': ['uniqueid', 'imdbnumber'],
+    }).get('tvshowdetails')
+    if not details:
+        return None
+    if len(_show_ids_cache) >= _SHOW_IDS_CACHE_MAX:
+        _show_ids_cache.clear()
+    _show_ids_cache[tvshow_id] = details
+    return details
+
 
 def _hmsm_to_seconds(t: dict) -> float:
     """Convert a Kodi time dict {hours, minutes, seconds, milliseconds} to seconds."""

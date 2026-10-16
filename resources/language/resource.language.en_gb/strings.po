@@ -161,6 +161,10 @@ msgctxt "#32055"
 msgid "Done! {0} playlists written, {1} failed."
 msgstr ""
 
+msgctxt "#32056"
+msgid "Sync failed: Chronicle is not connected or cannot be reached."
+msgstr ""
+
 # ── Device / QR auth ──────────────────────────────────────────────────────────
 
 msgctxt "#32060"
