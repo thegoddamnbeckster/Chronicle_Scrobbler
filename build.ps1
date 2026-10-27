@@ -67,7 +67,7 @@ if (-not (Test-Path $sharedDir)) {
     Write-Error "Shared modules not found at $sharedDir -- check out Chronicle_Scraper next to this repository."
     exit 1
 }
-foreach ($name in @("logger.py", "redact.py", "http_core.py", "device_name.py", "device_auth.py", "qr_dialog.py", "connection_ui.py")) {
+foreach ($name in @("logger.py", "redact.py", "http_core.py", "connection_health.py", "device_name.py", "device_auth.py", "qr_dialog.py", "connection_ui.py")) {
     $src = Join-Path $sharedDir $name
     if (-not (Test-Path $src)) { Write-Error "Missing shared module: $name"; exit 1 }
     Copy-Item $src (Join-Path $sourcePath "lib\$name") -Force

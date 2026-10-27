@@ -17,7 +17,7 @@ import xbmcgui
 import xbmcaddon
 
 from lib.logger import Logger
-from lib.chronicle_client import ChronicleClient
+from lib.chronicle_client import ChronicleClient, health
 from lib.connection_ui import ConnectionUi, parse_script_args
 from lib.reset_manager import ResetManager
 from lib.device_auth import DeviceAuthManager
@@ -28,7 +28,7 @@ log   = Logger('default')
 
 _on_connected = None
 
-_ui = ConnectionUi(ADDON, log, ChronicleClient, lambda base_url: DeviceAuthManager(base_url=base_url), _on_connected)
+_ui = ConnectionUi(ADDON, log, ChronicleClient, lambda base_url: DeviceAuthManager(base_url=base_url), _on_connected, health=health)
 
 
 def _get_args():

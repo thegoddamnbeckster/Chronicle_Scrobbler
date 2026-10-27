@@ -14,10 +14,12 @@ import xbmcaddon
 
 from lib.http_core import (
     api_headers, call_with_timeout, find_shared_chronicle_url as _find_shared_url, normalize_base_url, user_agent)
+from lib import connection_health
 from lib.logger import Logger
 
 ADDON = xbmcaddon.Addon()
 log   = Logger('client')
+health = connection_health.install(ADDON, log)
 
 _USER_AGENT = user_agent(ADDON.getAddonInfo('id'))
 
@@ -74,7 +76,7 @@ class ChronicleClient:
         Returns True on success (HTTP 2xx), False otherwise.
         """
         base_url, api_key = self._settings()
-        if not base_url or not api_key:
+        if not health.not_configured(base_url, api_key):
             log.warning('Chronicle URL or API key not configured — scrobble skipped')
             return False
 
@@ -123,7 +125,7 @@ class ChronicleClient:
         'resumeUpdatedAt': iso-str|None}.
         """
         base_url, api_key = self._settings()
-        if not base_url or not api_key:
+        if not health.not_configured(base_url, api_key):
             return {}
 
         req = self._build_request(
@@ -157,7 +159,7 @@ class ChronicleClient:
             return True
 
         base_url, api_key = self._settings()
-        if not base_url or not api_key:
+        if not health.not_configured(base_url, api_key):
             return False
 
         req = self._build_request(
@@ -250,7 +252,7 @@ class ChronicleClient:
         fields -- e.g. 'pagination' -- too) -- `default` on any failure, including
         "not configured"."""
         base_url, api_key = self._settings()
-        if not base_url or not api_key:
+        if not health.not_configured(base_url, api_key):
             if warn_unconfigured:
                 log.warning('Chronicle URL or API key not configured — {0} skipped'.format(
                     warn_unconfigured))
