@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.6.0"
+       version="2.6.1"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,9 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.6.0 - NEW: a warning on screen when this add-on is not really talking to Chronicle. A missing address or API key, a key Chronicle rejects (401/403) and a Chronicle that cannot be reached each raise a Kodi warning that says what to do, instead of the work carrying on as if all was well; the Settings status line now says when the key was rejected.
+    <news>v2.6.1 - FIX: a new API key now takes effect at once, with no Kodi restart. After you reconnected, the running service kept sending the old key (its settings were read once at start-up) and every request was rejected with 401 until Kodi was restarted. The key and address are now read from the saved settings at each use, as are the sync on/off switches and intervals.
+
+v2.6.0 - NEW: a warning on screen when this add-on is not really talking to Chronicle. A missing address or API key, a key Chronicle rejects (401/403) and a Chronicle that cannot be reached each raise a Kodi warning that says what to do, instead of the work carrying on as if all was well; the Settings status line now says when the key was rejected.
 
 v2.5.0 - FIXES: (1) Episodes are now identified to Chronicle by their SHOW's ids (TVDB/TMDB/IMDb of the show) -- Kodi's own ids on an episode belong to the episode, and sending them made Chronicle attach episode ids to the show or match the wrong show. (2) The background poll no longer asks Kodi what is playing every few seconds while nothing is playing. (3) "Sync Lists to Kodi": a TV show in a list is now written as its episodes in order (it used to write the show's folder, which no player can open) and never matches a movie of the same name; lists whose names differ only by punctuation no longer overwrite each other; a failed request is reported as such instead of "Done! 0 written", and a user with no lists is told so. The connection screens (Edit Connection, Change URL, Test Connection, the "Connected as" status), the Chronicle HTTP client basics and the log tags are now one shared implementation across all the Chronicle add-ons, so a fix reaches every add-on at once. A server address that is not http:// or https:// (or has a malformed port) is now refused.
 

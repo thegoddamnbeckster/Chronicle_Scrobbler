@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """The Scrobbler's ChronicleClient: request shape, the atomic settings snapshot, and never raising."""
+import contextlib
 import io
 import json
 import unittest
@@ -9,6 +10,13 @@ from unittest import mock
 import tests.kodi_stubs  # noqa: F401
 
 from lib import chronicle_client
+
+
+@contextlib.contextmanager
+def _addon_patched(module, addon):
+    """Both ways the client reaches its settings: the module's ADDON and the fresh xbmcaddon.Addon() it opens for the key and address."""
+    with mock.patch.object(module, 'ADDON', addon), mock.patch.object(module.xbmcaddon, 'Addon', return_value=addon):
+        yield
 
 
 class _Resp:
@@ -25,16 +33,31 @@ class _Resp:
         return False
 
 
+_STARTED = []
+
+
+def _stop_patches():
+    while _STARTED:
+        _STARTED.pop().stop()
+
+
 def _client(url='chronicle:7979/', key='k'):
+    """A client whose settings come from a fake add-on. The client reads them at each use, so the patch stays on until the test ends
+    (the test classes call _stop_patches in tearDown)."""
     addon = mock.MagicMock()
     addon.getSetting.side_effect = lambda k: {'chronicle_url': url, 'api_key': key}.get(k, '')
     addon.getAddonInfo.return_value = 'service.chronicle.scrobbler'
-    with mock.patch.object(chronicle_client, 'ADDON', addon):
-        c = chronicle_client.ChronicleClient()
-    return c, addon
+    for patcher in (mock.patch.object(chronicle_client, 'ADDON', addon),
+                    mock.patch.object(chronicle_client.xbmcaddon, 'Addon', return_value=addon)):
+        patcher.start()
+        _STARTED.append(patcher)
+    return chronicle_client.ChronicleClient(), addon
 
 
 class _Net(unittest.TestCase):
+    def tearDown(self):
+        _stop_patches()
+
     def _urlopen(self, resp=None, exc=None):
         calls = []
 
@@ -50,16 +73,18 @@ class _Net(unittest.TestCase):
 
 
 class TestSettings(unittest.TestCase):
+    def tearDown(self):
+        _stop_patches()
+
     def test_url_is_normalised_and_scheme_restricted(self):
         self.assertEqual(_client('chronicle:7979/')[0]._settings(), ('http://chronicle:7979', 'k'))
         self.assertEqual(_client('file:///etc/passwd')[0]._settings()[0], '')
 
-    def test_refresh_picks_up_a_new_connection_as_one_snapshot(self):
+    def test_a_key_saved_while_the_client_lives_is_used_without_any_refresh(self):
+        # The service keeps one client for the whole Kodi session; the key the Settings page saves later must reach it at once.
         c, addon = _client('http://a', 'k1')
-        addon.getSetting.side_effect = lambda k: {'chronicle_url': 'http://b', 'api_key': 'k2'}.get(k, '')
         self.assertEqual(c._settings(), ('http://a', 'k1'))
-        with mock.patch.object(chronicle_client, 'ADDON', addon):
-            c.refresh_settings()
+        addon.getSetting.side_effect = lambda k: {'chronicle_url': 'http://b', 'api_key': 'k2'}.get(k, '')
         self.assertEqual(c._settings(), ('http://b', 'k2'))
 
     def test_unconfigured_client_does_no_network_and_returns_neutral_values(self):
@@ -159,7 +184,7 @@ class TestSharedUrl(unittest.TestCase):
     def test_delegates_with_this_addons_id(self):
         addon = mock.MagicMock()
         addon.getAddonInfo.return_value = 'service.chronicle.scrobbler'
-        with mock.patch.object(chronicle_client, 'ADDON', addon), \
+        with _addon_patched(chronicle_client, addon), \
                 mock.patch.object(chronicle_client, '_find_shared_url', return_value='http://x') as find:
             self.assertEqual(chronicle_client.find_shared_chronicle_url(), 'http://x')
         self.assertEqual(find.call_args[0][0], 'service.chronicle.scrobbler')
