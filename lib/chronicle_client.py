@@ -209,7 +209,7 @@ class ChronicleClient:
                                warn_unconfigured='get_current_user()')
 
     def test_connection(self):
-        """GET /api/health — verify connectivity and API key.
+        """GET /api/v1/users/me — verify connectivity AND the API key (/api/health answers without a key, so it would pass with a bad one).
 
         Returns a (success: bool, message: str) tuple.
         """
@@ -217,7 +217,10 @@ class ChronicleClient:
         if not base_url:
             return False, 'Chronicle URL is not configured.'
 
-        req = self._build_request(base_url, api_key, '/api/health')
+        if not api_key:
+            return False, 'No API key is saved. Choose Edit Connection to connect.'
+
+        req = self._build_request(base_url, api_key, '/api/v1/users/me')
 
         def _do():
             with urllib.request.urlopen(req, timeout=10) as resp:
@@ -231,6 +234,8 @@ class ChronicleClient:
             # hang here freezes that dialog instead of surfacing an error.
             return call_with_timeout(_do, timeout=10)
         except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                return False, 'Chronicle rejected the API key saved on this device (HTTP {0}). Choose Edit Connection to reconnect.'.format(exc.code)
             return False, 'HTTP {0}: {1}'.format(exc.code, exc.reason)
         except Exception as exc:
             return False, str(exc)

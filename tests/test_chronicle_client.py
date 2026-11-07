@@ -165,10 +165,15 @@ class TestLibraryAndHealth(_Net):
 
     def test_test_connection_reports_http_errors(self):
         c, _ = _client()
-        self._urlopen(_Resp(status=200))
+        calls = self._urlopen(_Resp(status=200))
         self.assertEqual(c.test_connection(), (True, ''))
+        # /api/health answers without a key, so only an authenticated call can prove the key is accepted
+        self.assertTrue(calls[0][0].full_url.endswith('/api/v1/users/me'))
         self._urlopen(exc=urllib.error.HTTPError('u', 401, 'Unauthorized', {}, io.BytesIO(b'')))
-        self.assertEqual(c.test_connection(), (False, 'HTTP 401: Unauthorized'))
+        ok, message = c.test_connection()
+        self.assertFalse(ok)
+        self.assertIn('rejected the API key saved on this device', message)
+        self.assertIn('Edit Connection', message)
         self._urlopen(exc=urllib.error.URLError('refused'))
         ok, message = c.test_connection()
         self.assertFalse(ok)
