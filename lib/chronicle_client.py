@@ -13,7 +13,7 @@ import urllib.error
 import xbmcaddon
 
 from lib.http_core import (
-    api_headers, call_with_timeout, find_shared_chronicle_url as _find_shared_url, normalize_base_url, user_agent)
+    api_headers, call_with_timeout, check_connection, find_shared_chronicle_url as _find_shared_url, normalize_base_url, user_agent)
 from lib import connection_health
 from lib.logger import Logger
 
@@ -209,36 +209,9 @@ class ChronicleClient:
                                warn_unconfigured='get_current_user()')
 
     def test_connection(self):
-        """GET /api/v1/users/me — verify connectivity AND the API key (/api/health answers without a key, so it would pass with a bad one).
-
-        Returns a (success: bool, message: str) tuple.
-        """
+        """Returns a (success: bool, message: str) tuple; see http_core.check_connection."""
         base_url, api_key = self._settings()
-        if not base_url:
-            return False, 'Chronicle URL is not configured.'
-
-        if not api_key:
-            return False, 'No API key is saved. Choose Edit Connection to connect.'
-
-        req = self._build_request(base_url, api_key, '/api/v1/users/me')
-
-        def _do():
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                if resp.status == 200:
-                    return True, ''
-                return False, 'Unexpected HTTP {0}'.format(resp.status)
-
-        try:
-            # call_with_timeout -- this is called synchronously from the Settings
-            # dialog's "Test Connection" button; without the watchdog, a DNS/connect
-            # hang here freezes that dialog instead of surfacing an error.
-            return call_with_timeout(_do, timeout=10)
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                return False, 'Chronicle rejected the API key saved on this device (HTTP {0}). Choose Edit Connection to reconnect.'.format(exc.code)
-            return False, 'HTTP {0}: {1}'.format(exc.code, exc.reason)
-        except Exception as exc:
-            return False, str(exc)
+        return check_connection(base_url, api_key, lambda path: self._build_request(base_url, api_key, path))
 
     # ── private ─────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.6.2"
+       version="2.6.3"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,9 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.6.2 - FIX: Test Connection now proves the API key. It used to ask Chronicle's open health page, which answers without a key, so it reported success while every real request was being rejected. It now makes an authenticated request and says plainly when the key is rejected or missing, and to choose Edit Connection.
+    <news>v2.6.3 - CHANGE: Test Connection now uses one check shared by all the Chronicle add-ons (lib/http_core.py check_connection) instead of its own copy; behaviour is unchanged.
+
+v2.6.2 - FIX: Test Connection now proves the API key. It used to ask Chronicle's open health page, which answers without a key, so it reported success while every real request was being rejected. It now makes an authenticated request and says plainly when the key is rejected or missing, and to choose Edit Connection.
 
 v2.6.1 - FIX: a new API key now takes effect at once, with no Kodi restart. After you reconnected, the running service kept sending the old key (its settings were read once at start-up) and every request was rejected with 401 until Kodi was restarted. The key and address are now read from the saved settings at each use, as are the sync on/off switches and intervals.
 
