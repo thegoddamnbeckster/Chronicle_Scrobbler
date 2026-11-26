@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="service.chronicle.scrobbler"
        name="Chronicle Scrobbler"
-       version="2.6.3"
+       version="2.6.4"
        provider-name="Michael Beck">
 
   <requires>
@@ -30,7 +30,8 @@
     </assets>
     <summary lang="en_GB">Chronicle Scrobbler</summary>
     <description lang="en_GB">Scrobbles your Kodi playback to your self-hosted Chronicle server, and syncs ratings, artwork, and watch counts both ways. Chronicle is the source of truth for ratings and art (always pushed to Kodi); play counts and last-played dates reconcile in whichever direction has the more recent watch. Covers movies, movie collections, TV shows, and individual episodes. Supports resetting Kodi watch progress for a fresh rewatch while keeping your full history safe in Chronicle.</description>
-    <news>v2.6.3 - CHANGE: Test Connection now uses one check shared by all the Chronicle add-ons (lib/http_core.py check_connection) instead of its own copy; behaviour is unchanged.
+    <news>v2.6.4 - IMPROVEMENT: a Chronicle outage is announced once. 'Cannot reach Chronicle' is shown once per outage for the whole Kodi (not once per add-on, and not again every few hours while it lasts); a watch/rating sync that cannot reach Chronicle stops at the first item instead of waiting out five, and neither sync adds an error toast of its own for a lost connection. Also includes the Change URL fix: the address is always asked for and saved again with the key.
+v2.6.3 - CHANGE: Test Connection now uses one check shared by all the Chronicle add-ons (lib/http_core.py check_connection) instead of its own copy; behaviour is unchanged.
 
 v2.6.2 - FIX: Test Connection now proves the API key. It used to ask Chronicle's open health page, which answers without a key, so it reported success while every real request was being rejected. It now makes an authenticated request and says plainly when the key is rejected or missing, and to choose Edit Connection.
 
