@@ -10,7 +10,7 @@ import default
 
 class TestDispatch(unittest.TestCase):
     def _run(self, *argv):
-        names = ('_connect_to_chronicle', '_change_chronicle_url', '_test_connection', '_sync_lists', '_refresh_auth_status')
+        names = ('_connect_to_chronicle', '_change_chronicle_url', '_test_connection', '_sync_lists', '_show_settings')
         patches = {n: mock.patch.object(default, n) for n in names}
         mocks = {n: p.start() for n, p in patches.items()}
         for p in patches.values():
@@ -44,10 +44,8 @@ class TestDispatch(unittest.TestCase):
         mocks = self._run('action=reset_movie')
         mocks['reset'].return_value.prompt_reset_movie.assert_called_once()
 
-    def test_no_action_refreshes_the_status_and_opens_settings(self):
-        mocks = self._run()
-        mocks['_refresh_auth_status'].assert_called_once()
-        mocks['addon'].openSettings.assert_called_once()
+    def test_no_action_opens_settings(self):
+        self._run()['_show_settings'].assert_called_once()
 
 
 class TestSyncListsMessages(unittest.TestCase):
